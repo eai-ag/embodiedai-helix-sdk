@@ -32,10 +32,10 @@ class Helix:
             self._cmd_configuration_pub = roslibpy.Topic(self.client,'/helix/command/configuration','control_msgs/InterfaceValue')
             self._cmd_tendon_lengths_pub = roslibpy.Topic(self.client,'/helix/command/tendon_lengths','control_msgs/InterfaceValue')
 
-            self._estimated_cartesian_sub = roslibpy.Topic(self.client,'/helx/estimated/cartesian','geometry_msgs/TransformStamped')
+            self._estimated_cartesian_sub = roslibpy.Topic(self.client,'/helix/estimated/cartesian','geometry_msgs/TransformStamped')
             self._estimated_cartesian_sub.subscribe(self._cartesian_callback)
 
-            self._estimated_configuration_sub = roslibpy.Topic(self.client,'/helix/etimated/configuration','control_msgs/InterfaceValue')
+            self._estimated_configuration_sub = roslibpy.Topic(self.client,'/helix/estimated/configuration','control_msgs/InterfaceValue')
             self._estimated_configuration_sub.subscribe(self._configuration_callback)
 
             self._estimated_tendon_lengths_sub = roslibpy.Topic(self.client,'/helix/estimated/tendon_lengths','control_msgs/InterfaceValue')
@@ -177,25 +177,13 @@ class Helix:
         self._latest_tendon_lengths = message
 
     def get_estimated_cartesian(self) -> Optional[Dict[str, Any]]:
-        if self._latest_cartesian:
-            return self._latest_cartesian
-        return None
+        return self._latest_cartesian
 
-    def get_estimated_configuration(self) -> Optional[Dict[str, List[float]]]:
-        if self._latest_configuration:
-            return {
-                'interface_names': self._latest_configuration.get('interface_names', []),
-                'values': self._latest_configuration.get('values', [])
-            }
-        return None
+    def get_estimated_configuration(self) -> Optional[Dict[str, float]]:
+        return self._latest_configuration
 
-    def get_estimated_tendon_lengths(self) -> Optional[Dict[str, List[float]]]:
-        if self._latest_tendon_lengths:
-            return {
-                'interface_names': self._latest_tendon_lengths.get('interface_names', []),
-                'values': self._latest_tendon_lengths.get('values', [])
-            }
-        return None
+    def get_estimated_tendon_lengths(self) -> Optional[Dict[str, float]]:
+        return self._latest_tendon_lengths
 
 
     def __repr__(self) -> str:
