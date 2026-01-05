@@ -17,6 +17,8 @@ class TestHardwareConnection:
     def test_connect_to_robot(self, helix):
         assert helix.is_connected()
 
+
+class TestControlModeSwitching:
     def test_switch_to_none_mode(self, helix):
         result = helix.set_control_mode("none")
         assert result is True
@@ -39,6 +41,43 @@ class TestHardwareConnection:
 
 
 
+class TestEstimatedStates:
+
+    def test_get_estimated_tendon_lengths(self, helix):
+        time.sleep(0.3)
+        tendon_lengths = helix.get_estimated_tendon_lengths()
+        assert tendon_lengths is not None
+        assert isinstance(tendon_lengths, dict)
+        assert 'interface_names' in tendon_lengths
+        assert 'values' in tendon_lengths
+        assert len(tendon_lengths['interface_names']) == len(tendon_lengths['values'])
+        required_tendons = {f"tendon{i}" for i in range(9)}
+        assert set(tendon_lengths['interface_names']) == required_tendons
+
+    def test_get_estimated_configuration(self, helix):
+        time.sleep(0.3)
+        configuration = helix.get_estimated_configuration()
+        assert configuration is not None
+        assert isinstance(configuration, dict)
+        assert 'interface_names' in configuration
+        assert 'values' in configuration
+        assert len(configuration['interface_names']) == len(configuration['values'])
+        required_values = {"segment0_dx", "segment0_dy", "segment0_l",
+                           "segment1_dx", "segment1_dy", "segment1_l",
+                           "segment2_dx", "segment2_dy", "segment2_l"}
+        assert set(configuration['interface_names']) == required_values
+
+    def test_get_estimated_cartesian(self, helix):
+        time.sleep(0.3)
+        cartesian = helix.get_estimated_cartesian()
+        assert cartesian is not None
+        assert isinstance(cartesian, dict)
+        assert 'translation' in cartesian["transform"]
+        assert 'rotation' in cartesian["transform"] 
+        translation = cartesian["transform"]['translation']
+        rotation = cartesian["transform"]['rotation']
+        assert all(axis in translation for axis in ['x', 'y', 'z'])
+        assert all(axis in rotation for axis in ['x', 'y', 'z', 'w'])
 
 
 
@@ -108,50 +147,8 @@ class TestHardwareConnection:
 #             helix.command_cartesian(position, orientation)
 
 
-# class TestDynamixelCommands:
-#     def test_send_dynamixel_command(self, helix):
-#         helix.set_control_mode("position_control")
-#         time.sleep(0.5)
-
-#         interface_names = ["dynamixel1", "dynamixel2"]
-#         values = [0.0, 0.0]
-
-#         result = helix.command_dynamixels(interface_names, values)
-#         assert result is True
-
-#     def test_dynamixel_requires_position_control(self, helix):
-#         helix.set_control_mode("none")
-#         time.sleep(0.5)
-
-#         interface_names = ["dynamixel1", "dynamixel2"]
-#         values = [0.0, 0.0]
-
-#         with pytest.raises(RuntimeError, match="position_control mode"):
-#             helix.command_dynamixels(interface_names, values)
 
 
-# class TestEstimatedStates:
-#     def test_get_estimated_cartesian(self, helix):
-#         time.sleep(1.0)
-#         cartesian = helix.get_estimated_cartesian()
-#         assert cartesian is not None
-#         assert isinstance(cartesian, dict)
-
-#     def test_get_estimated_configuration(self, helix):
-#         time.sleep(1.0)
-#         configuration = helix.get_estimated_configuration()
-#         assert configuration is not None
-#         assert isinstance(configuration, dict)
-#         assert 'interface_names' in configuration
-#         assert 'values' in configuration
-
-#     def test_get_estimated_tendon_lengths(self, helix):
-#         time.sleep(1.0)
-#         tendon_lengths = helix.get_estimated_tendon_lengths()
-#         assert tendon_lengths is not None
-#         assert isinstance(tendon_lengths, dict)
-#         assert 'interface_names' in tendon_lengths
-#         assert 'values' in tendon_lengths
 
 
 # class TestFullWorkflow:
