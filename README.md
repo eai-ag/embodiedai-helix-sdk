@@ -33,8 +33,30 @@ helix.command_configuration(
 config = helix.get_estimated_configuration()
 print(f"Configuration: {config}")
 
-# Disconnect
+# Disconnect (allows reconnection)
 helix.disconnect()
+
+# Or permanently terminate at end of program
+# helix.terminate()  # Cannot reconnect after this!
+```
+
+## Important: Reconnection Behavior
+
+The SDK uses two different disconnect methods:
+
+- **`disconnect()`** - Closes the connection but keeps the reactor running. **Use this if you need to reconnect later.**
+- **`terminate()`** - Permanently stops the Twisted reactor. **Only use this at the very end of your program.** You cannot reconnect after calling this in the same Python process.
+
+```python
+# Good: Can reconnect
+helix.connect()
+helix.disconnect()
+helix.connect()  # This works!
+
+# Bad: Cannot reconnect
+helix.connect()
+helix.terminate()
+helix.connect()  # This will fail with ReactorNotRestartable error!
 ```
 
 ## Control Modes

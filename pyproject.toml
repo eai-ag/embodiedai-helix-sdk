@@ -14,7 +14,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "roslibpy>=1.0.0",
+    "roslibpy>=2.0.0",
 ]
 
 [project.optional-dependencies]

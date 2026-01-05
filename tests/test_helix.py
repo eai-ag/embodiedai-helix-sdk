@@ -62,6 +62,21 @@ class TestHelixConnection:
         helix.connect()
         helix.disconnect()
 
+        mock_client.close.assert_called_once()
+        assert helix.client is None
+
+    @patch('embodiedai_helix_sdk.helix.roslibpy.Ros')
+    @patch('embodiedai_helix_sdk.helix.roslibpy.Service')
+    @patch('embodiedai_helix_sdk.helix.roslibpy.Topic')
+    def test_terminate(self, mock_topic, mock_service, mock_ros):
+        mock_client = Mock()
+        mock_client.is_connected = True
+        mock_ros.return_value = mock_client
+
+        helix = Helix("eai-helix-0.local")
+        helix.connect()
+        helix.terminate()
+
         mock_client.terminate.assert_called_once()
         assert helix.client is None
 

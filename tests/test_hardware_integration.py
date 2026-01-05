@@ -1,6 +1,6 @@
 import pytest
 import time
-from embodiedai_helix_api import Helix
+from embodiedai_helix_sdk import Helix
 
 
 @pytest.fixture
@@ -72,19 +72,21 @@ class TestCartesianCommands:
         helix.switch_control_mode("position_control")
         time.sleep(0.5)
 
-        values = [0.1, 0.2, 0.3, 0.0, 0.0, 0.0]
+        position = [0.1, 0.2, 0.3]
+        orientation = [0.0, 0.0, 0.0, 1.0]
 
-        result = helix.command_cartesian(values)
+        result = helix.command_cartesian(position, orientation)
         assert result is True
 
     def test_cartesian_requires_position_control(self, helix):
         helix.switch_control_mode("none")
         time.sleep(0.5)
 
-        values = [0.1, 0.2, 0.3, 0.0, 0.0, 0.0]
+        position = [0.1, 0.2, 0.3]
+        orientation = [0.0, 0.0, 0.0, 1.0]
 
         with pytest.raises(RuntimeError, match="position_control mode"):
-            helix.command_cartesian(values)
+            helix.command_cartesian(position, orientation)
 
 
 class TestDynamixelCommands:
@@ -114,19 +116,23 @@ class TestEstimatedStates:
         time.sleep(1.0)
         cartesian = helix.get_estimated_cartesian()
         assert cartesian is not None
-        assert isinstance(cartesian, list)
+        assert isinstance(cartesian, dict)
 
     def test_get_estimated_configuration(self, helix):
         time.sleep(1.0)
         configuration = helix.get_estimated_configuration()
         assert configuration is not None
-        assert isinstance(configuration, list)
+        assert isinstance(configuration, dict)
+        assert 'interface_names' in configuration
+        assert 'values' in configuration
 
     def test_get_estimated_tendon_lengths(self, helix):
         time.sleep(1.0)
         tendon_lengths = helix.get_estimated_tendon_lengths()
         assert tendon_lengths is not None
-        assert isinstance(tendon_lengths, list)
+        assert isinstance(tendon_lengths, dict)
+        assert 'interface_names' in tendon_lengths
+        assert 'values' in tendon_lengths
 
 
 class TestFullWorkflow:

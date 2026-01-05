@@ -38,7 +38,7 @@ class Helix:
 
             self._control_mode_service = roslibpy.Service(
                 self.client,
-                '/helix/set_control_mode',
+                '/helix/dynamixel_driver_node/switch_control_mode',
                 'std_srvs/SetString'
             )
 
@@ -93,6 +93,11 @@ class Helix:
             return False
 
     def disconnect(self):
+        """Disconnect from the robot.
+
+        Note: Uses close() instead of terminate() to allow reconnection.
+        The Twisted reactor cannot be restarted once terminated.
+        """
         if self.client and self.client.is_connected:
             if self._estimated_cartesian_sub:
                 self._estimated_cartesian_sub.unsubscribe()
@@ -100,6 +105,35 @@ class Helix:
                 self._estimated_configuration_sub.unsubscribe()
             if self._estimated_tendon_lengths_sub:
                 self._estimated_tendon_lengths_sub.unsubscribe()
+
+            # Use close() instead of terminate() to allow reconnection
+            # terminate() stops the reactor permanently (ReactorNotRestartable)
+            self.client.close()
+            self.client = None
+            self._control_mode_service = None
+            self._cmd_cartesian_pub = None
+            self._cmd_configuration_pub = None
+            self._cmd_dynamixels_pub = None
+            self._cmd_tendon_lengths_pub = None
+            self._estimated_cartesian_sub = None
+            self._estimated_configuration_sub = None
+            self._estimated_tendon_lengths_sub = None
+
+    def terminate(self):
+        """Permanently terminate the connection and stop the reactor.
+
+        WARNING: After calling this method, you cannot reconnect in the same
+        Python process. Use disconnect() instead if you need to reconnect later.
+        This should only be called at the very end of your program.
+        """
+        if self.client:
+            if self.client.is_connected:
+                if self._estimated_cartesian_sub:
+                    self._estimated_cartesian_sub.unsubscribe()
+                if self._estimated_configuration_sub:
+                    self._estimated_configuration_sub.unsubscribe()
+                if self._estimated_tendon_lengths_sub:
+                    self._estimated_tendon_lengths_sub.unsubscribe()
 
             self.client.terminate()
             self.client = None

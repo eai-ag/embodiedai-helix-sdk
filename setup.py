@@ -20,4 +20,9 @@ setup(
     install_requires=[
         "roslibpy>=1.0.0",
     ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0.0",
+        ],
+    },
 )
