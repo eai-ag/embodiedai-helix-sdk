@@ -79,6 +79,7 @@ class Helix:
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
 
+
     def set_control_mode(self, mode: str) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
@@ -107,6 +108,7 @@ class Helix:
     def _check_position_control(self):
         if self._current_mode != ControlMode.POSITION_CONTROL:
             raise RuntimeError("Commands can only be sent in position_control mode")
+
 
     def command_configuration(self, interface_names: List[str], values: List[float]) -> bool:
         if not self.is_connected():
@@ -179,6 +181,7 @@ class Helix:
             print(f"Error sending cartesian command: {e}")
             return False
 
+
     def _cartesian_callback(self, message):
         self._latest_cartesian = message
 
@@ -208,6 +211,7 @@ class Helix:
                 'values': self._latest_tendon_lengths.get('values', [])
             }
         return None
+
 
     def __repr__(self) -> str:
         status = "connected" if self.is_connected() else "disconnected"
