@@ -1,14 +1,17 @@
 # Embodied AI Helix SDK
 
-Python SDK to control Embodied AI's Helix robot arm.
-
-**Package name:** `embodiedai-helix-sdk`
-**Import name:** `embodiedai_helix_sdk`
+Python SDK for controlling the Helix robot arm via ROS.
 
 ## Installation
 
 ```bash
-uv pip install -e .
+pip install embodiedai-helix-sdk
+```
+
+Or install from source:
+
+```bash
+pip install -e .
 ```
 
 ## Quick Start
@@ -16,75 +19,67 @@ uv pip install -e .
 ```python
 from embodiedai_helix_sdk import Helix
 
-# Connect to robot
 helix = Helix("eai-helix-0.local")
 helix.connect()
 
-# Switch to position control mode
 helix.switch_control_mode("position_control")
 
-# Command the robot
 helix.command_configuration(
     interface_names=['segment0_dx', 'segment0_dy', 'segment0_l'],
     values=[0.0, 0.0, 0.1]
 )
 
-# Get estimated state
 config = helix.get_estimated_configuration()
-print(f"Configuration: {config}")
+print(config)
 
-# Disconnect (allows reconnection)
 helix.disconnect()
-
-# Or permanently terminate at end of program
-# helix.terminate()  # Cannot reconnect after this!
 ```
 
-## Important: Reconnection Behavior
+## Running Tests
 
-The SDK uses two different disconnect methods:
-
-- **`disconnect()`** - Closes the connection but keeps the reactor running. **Use this if you need to reconnect later.**
-- **`terminate()`** - Permanently stops the Twisted reactor. **Only use this at the very end of your program.** You cannot reconnect after calling this in the same Python process.
-
-```python
-# Good: Can reconnect
-helix.connect()
-helix.disconnect()
-helix.connect()  # This works!
-
-# Bad: Cannot reconnect
-helix.connect()
-helix.terminate()
-helix.connect()  # This will fail with ReactorNotRestartable error!
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/
 ```
-
-## Control Modes
-
-- `"none"` - No control
-- `"position_control"` - Position control mode (required for sending commands)
-- `"current_control"` - Current control mode
-- `"velocity_control"` - Velocity control mode
 
 ## API Reference
 
+### Connection
+
+**`Helix(host, port=9090)`**
+Create a Helix robot instance.
+
+**`connect(timeout=5.0) -> bool`**
+Connect to the robot. Returns True if successful.
+
+**`disconnect()`**
+Disconnect from the robot.
+
+**`is_connected() -> bool`**
+Check connection status.
+
+### Control Modes
+
+**`switch_control_mode(mode: str) -> bool`**
+Switch control mode. Valid modes: `"none"`, `"position_control"`, `"current_control"`, `"velocity_control"`.
+
+**`get_control_mode() -> Optional[str]`**
+Get current control mode.
+
 ### Command Methods
 
-All command methods require the robot to be in `"position_control"` mode.
+All command methods require `position_control` mode.
 
-#### `command_configuration(interface_names, values)`
-Command the robot in configuration space (dx, dy, L for each segment).
+**`command_configuration(interface_names: List[str], values: List[float]) -> bool`**
+Command configuration space (dx, dy, L for each segment).
 
 ```python
 helix.command_configuration(
-    interface_names=['segment0_dx', 'segment0_dy', 'segment0_l',
-                     'segment1_dx', 'segment1_dy', 'segment1_l',
-                     'segment2_dx', 'segment2_dy', 'segment2_l'],
-    values=[0.0, 0.0, 0.1, 0.0, 0.0, 0.2, 0.0, 0.0, 0.2]
+    interface_names=['segment0_dx', 'segment0_dy', 'segment0_l'],
+    values=[0.0, 0.0, 0.1]
 )
 ```
 
-#### `command_tendon_lengths(interface_names, values)`
+**`command_tendon_lengths(interface_names: List[str], values: List[float]) -> bool`**
 Command individual tendon lengths.
 
 ```python
@@ -94,64 +89,36 @@ helix.command_tendon_lengths(
 )
 ```
 
-#### `command_cartesian(position, orientation)`
-Command the end-effector pose in Cartesian space.
+**`command_cartesian(position: List[float], orientation: List[float]) -> bool`**
+Command end-effector pose in Cartesian space.
 
 ```python
 helix.command_cartesian(
-    position=[0.0, 0.0, 0.5],  # [x, y, z] in meters
-    orientation=[0.0, 0.0, 0.0, 1.0]  # [x, y, z, w] quaternion
+    position=[0.0, 0.0, 0.5],
+    orientation=[0.0, 0.0, 0.0, 1.0]
 )
 ```
 
-#### `command_dynamixels(interface_names, values)`
-Command individual Dynamixel motors directly.
+**`command_dynamixels(interface_names: List[str], values: List[float]) -> bool`**
+Command Dynamixel motors directly.
 
 ```python
 helix.command_dynamixels(
-    interface_names=['dynamixel0', 'dynamixel1', 'dynamixel2'],
-    values=[0.0, 0.0, 0.0]
+    interface_names=['dynamixel0', 'dynamixel1'],
+    values=[0.0, 0.0]
 )
 ```
 
 ### State Methods
 
-#### `get_estimated_configuration()`
-Returns the estimated configuration space state.
+**`get_estimated_configuration() -> Optional[Dict]`**
+Get estimated configuration space state.
+Returns: `{'interface_names': [...], 'values': [...]}`
 
-```python
-config = helix.get_estimated_configuration()
-# Returns: {'interface_names': [...], 'values': [...]}
-```
+**`get_estimated_tendon_lengths() -> Optional[Dict]`**
+Get estimated tendon lengths.
+Returns: `{'interface_names': [...], 'values': [...]}`
 
-#### `get_estimated_tendon_lengths()`
-Returns the estimated tendon lengths.
-
-```python
-tendons = helix.get_estimated_tendon_lengths()
-# Returns: {'interface_names': [...], 'values': [...]}
-```
-
-#### `get_estimated_cartesian()`
-Returns the estimated Cartesian pose.
-
-```python
-pose = helix.get_estimated_cartesian()
-# Returns TransformStamped message dict with 'transform' and 'header' fields
-```
-
-## Development
-
-```bash
-# Install with dev dependencies
-uv pip install -e ".[dev]"
-
-# Run tests
-pytest tests/
-```
-
-## Requirements
-
-- Python >= 3.7
-- roslibpy >= 1.0.0
-- ROSBridge server running on robot (port 9090)
+**`get_estimated_cartesian() -> Optional[Dict]`**
+Get estimated Cartesian pose.
+Returns: TransformStamped message dict.

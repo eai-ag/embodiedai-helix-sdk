@@ -21,3 +21,12 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
 ]
+
+[tool.pytest.ini_options]
+# Note: Due to ROS plugin conflicts, tests should be run with:
+# PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/
+# or use the provided test script: ./run_tests.sh
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

@@ -2,13 +2,11 @@ import roslibpy
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
-
 class ControlMode(Enum):
     NONE = "none"
     POSITION_CONTROL = "position_control"
     CURRENT_CONTROL = "current_control"
     VELOCITY_CONTROL = "velocity_control"
-
 
 class Helix:
     def __init__(self, host: str, port: int = 9090):
@@ -93,11 +91,6 @@ class Helix:
             return False
 
     def disconnect(self):
-        """Disconnect from the robot.
-
-        Note: Uses close() instead of terminate() to allow reconnection.
-        The Twisted reactor cannot be restarted once terminated.
-        """
         if self.client and self.client.is_connected:
             if self._estimated_cartesian_sub:
                 self._estimated_cartesian_sub.unsubscribe()
@@ -106,36 +99,7 @@ class Helix:
             if self._estimated_tendon_lengths_sub:
                 self._estimated_tendon_lengths_sub.unsubscribe()
 
-            # Use close() instead of terminate() to allow reconnection
-            # terminate() stops the reactor permanently (ReactorNotRestartable)
             self.client.close()
-            self.client = None
-            self._control_mode_service = None
-            self._cmd_cartesian_pub = None
-            self._cmd_configuration_pub = None
-            self._cmd_dynamixels_pub = None
-            self._cmd_tendon_lengths_pub = None
-            self._estimated_cartesian_sub = None
-            self._estimated_configuration_sub = None
-            self._estimated_tendon_lengths_sub = None
-
-    def terminate(self):
-        """Permanently terminate the connection and stop the reactor.
-
-        WARNING: After calling this method, you cannot reconnect in the same
-        Python process. Use disconnect() instead if you need to reconnect later.
-        This should only be called at the very end of your program.
-        """
-        if self.client:
-            if self.client.is_connected:
-                if self._estimated_cartesian_sub:
-                    self._estimated_cartesian_sub.unsubscribe()
-                if self._estimated_configuration_sub:
-                    self._estimated_configuration_sub.unsubscribe()
-                if self._estimated_tendon_lengths_sub:
-                    self._estimated_tendon_lengths_sub.unsubscribe()
-
-            self.client.terminate()
             self.client = None
             self._control_mode_service = None
             self._cmd_cartesian_pub = None
@@ -284,21 +248,11 @@ class Helix:
         self._latest_tendon_lengths = message
 
     def get_estimated_cartesian(self) -> Optional[Dict[str, Any]]:
-        """Returns the estimated cartesian pose as a TransformStamped message.
-
-        Returns:
-            Dict with 'transform' (translation and rotation) and 'header' fields, or None
-        """
         if self._latest_cartesian:
             return self._latest_cartesian
         return None
 
     def get_estimated_configuration(self) -> Optional[Dict[str, List[float]]]:
-        """Returns the estimated configuration as interface_names and values.
-
-        Returns:
-            Dict with 'interface_names' and 'values' fields, or None
-        """
         if self._latest_configuration:
             return {
                 'interface_names': self._latest_configuration.get('interface_names', []),
@@ -307,11 +261,6 @@ class Helix:
         return None
 
     def get_estimated_tendon_lengths(self) -> Optional[Dict[str, List[float]]]:
-        """Returns the estimated tendon lengths as interface_names and values.
-
-        Returns:
-            Dict with 'interface_names' and 'values' fields, or None
-        """
         if self._latest_tendon_lengths:
             return {
                 'interface_names': self._latest_tendon_lengths.get('interface_names', []),
