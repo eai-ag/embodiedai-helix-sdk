@@ -1,4 +1,4 @@
-from .helix import Helix, ControlMode
+from .helix import Helix
 
 __version__ = "0.1.0"
-__all__ = ["Helix", "ControlMode"]
+__all__ = ["Helix"]

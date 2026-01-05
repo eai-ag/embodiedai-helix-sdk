@@ -85,12 +85,10 @@ class Helix:
                 return True
             else:
                 error_message = response.get('message', 'Unknown error')
-                raise RuntimeError(f"Failed to switch control mode: {error_message}")
-
-        except RuntimeError:
-            raise
+                raise RuntimeError(error_message)
         except Exception as e:
-            raise RuntimeError(f"Error switching control mode: {e}")
+            raise RuntimeError(e)
+
 
     def _check_position_control(self):
         if self._current_mode != "position_control":
