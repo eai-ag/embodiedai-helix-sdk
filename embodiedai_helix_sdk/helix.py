@@ -13,12 +13,11 @@ class Helix:
         self.host = host
         self.port = port
         self.client: Optional[roslibpy.Ros] = None
-        self._control_mode_service: Optional[roslibpy.Service] = None
-        self._current_mode: Optional[ControlMode] = None
+        self._set_control_mode_service: Optional[roslibpy.Service] = None
+        self._get_control_mode_service: Optional[roslibpy.Service] = None
 
         self._cmd_cartesian_pub: Optional[roslibpy.Topic] = None
         self._cmd_configuration_pub: Optional[roslibpy.Topic] = None
-        self._cmd_dynamixels_pub: Optional[roslibpy.Topic] = None
         self._cmd_tendon_lengths_pub: Optional[roslibpy.Topic] = None
 
         self._estimated_cartesian_sub: Optional[roslibpy.Topic] = None
@@ -34,55 +33,20 @@ class Helix:
             self.client = roslibpy.Ros(host=self.host, port=self.port)
             self.client.run(timeout=timeout)
 
-            self._control_mode_service = roslibpy.Service(
-                self.client,
-                '/helix/dynamixel_driver_node/switch_control_mode',
-                'std_srvs/SetString'
-            )
+            self._current_mode: Optional[ControlMode] = None
+            self._set_control_mode_service = roslibpy.Service(self.client,'/helix/dynamixel_driver_node/set_control_mode','helix_interfaces/SetString')
 
-            self._cmd_cartesian_pub = roslibpy.Topic(
-                self.client,
-                '/helix/command/cartesian',
-                'geometry_msgs/Pose'
-            )
+            self._cmd_cartesian_pub = roslibpy.Topic(self.client,'/helix/command/cartesian','geometry_msgs/Pose')
+            self._cmd_configuration_pub = roslibpy.Topic(self.client,'/helix/command/configuration','control_msgs/InterfaceValue')
+            self._cmd_tendon_lengths_pub = roslibpy.Topic(self.client,'/helix/command/tendon_lengths','control_msgs/InterfaceValue')
 
-            self._cmd_configuration_pub = roslibpy.Topic(
-                self.client,
-                '/helix/command/configuration',
-                'control_msgs/InterfaceValue'
-            )
-
-            self._cmd_dynamixels_pub = roslibpy.Topic(
-                self.client,
-                '/helix/command/dynamixels',
-                'sensor_msgs/JointState'
-            )
-
-            self._cmd_tendon_lengths_pub = roslibpy.Topic(
-                self.client,
-                '/helix/command/tendon_lengths',
-                'control_msgs/InterfaceValue'
-            )
-
-            self._estimated_cartesian_sub = roslibpy.Topic(
-                self.client,
-                '/helix/estimated/cartesian',
-                'geometry_msgs/TransformStamped'
-            )
+            self._estimated_cartesian_sub = roslibpy.Topic(self.client,'/helx/estimated/cartesian','geometry_msgs/TransformStamped')
             self._estimated_cartesian_sub.subscribe(self._cartesian_callback)
 
-            self._estimated_configuration_sub = roslibpy.Topic(
-                self.client,
-                '/helix/estimated/configuration',
-                'control_msgs/InterfaceValue'
-            )
+            self._estimated_configuration_sub = roslibpy.Topic(self.client,'/helix/etimated/configuration','control_msgs/InterfaceValue')
             self._estimated_configuration_sub.subscribe(self._configuration_callback)
 
-            self._estimated_tendon_lengths_sub = roslibpy.Topic(
-                self.client,
-                '/helix/estimated/tendon_lengths',
-                'control_msgs/InterfaceValue'
-            )
+            self._estimated_tendon_lengths_sub = roslibpy.Topic(self.client,'/helix/estimated/tendon_lengths','control_msgs/InterfaceValue')
             self._estimated_tendon_lengths_sub.subscribe(self._tendon_lengths_callback)
 
             return self.is_connected()
@@ -101,11 +65,13 @@ class Helix:
 
             self.client.close()
             self.client = None
+
             self._control_mode_service = None
+
             self._cmd_cartesian_pub = None
             self._cmd_configuration_pub = None
-            self._cmd_dynamixels_pub = None
             self._cmd_tendon_lengths_pub = None
+
             self._estimated_cartesian_sub = None
             self._estimated_configuration_sub = None
             self._estimated_tendon_lengths_sub = None
@@ -113,7 +79,7 @@ class Helix:
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
 
-    def switch_control_mode(self, mode: str) -> bool:
+    def set_control_mode(self, mode: str) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
@@ -121,9 +87,7 @@ class Helix:
             control_mode = ControlMode(mode)
         except ValueError:
             valid_modes = [m.value for m in ControlMode]
-            raise ValueError(
-                f"Invalid control mode '{mode}'. Valid modes: {valid_modes}"
-            )
+            raise ValueError(f"Invalid control mode '{mode}'. Valid modes: {valid_modes}")
 
         try:
             request = roslibpy.ServiceRequest({'data': mode})
@@ -139,9 +103,6 @@ class Helix:
         except Exception as e:
             print(f"Error switching control mode: {e}")
             return False
-
-    def get_control_mode(self) -> Optional[str]:
-        return self._current_mode.value if self._current_mode else None
 
     def _check_position_control(self):
         if self._current_mode != ControlMode.POSITION_CONTROL:
@@ -216,26 +177,6 @@ class Helix:
             return True
         except Exception as e:
             print(f"Error sending cartesian command: {e}")
-            return False
-
-    def command_dynamixels(self, interface_names: List[str], values: List[float]) -> bool:
-        if not self.is_connected():
-            raise ConnectionError("Not connected to robot. Call connect() first.")
-
-        self._check_position_control()
-
-        if len(interface_names) != len(values):
-            raise ValueError("interface_names and values must have the same length")
-
-        try:
-            message = {
-                'name': interface_names,
-                'position': values
-            }
-            self._cmd_dynamixels_pub.publish(roslibpy.Message(message))
-            return True
-        except Exception as e:
-            print(f"Error sending dynamixels command: {e}")
             return False
 
     def _cartesian_callback(self, message):
