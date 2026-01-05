@@ -40,9 +40,7 @@ class TestControlModeSwitching:
             helix.set_control_mode("invalid_mode")
 
 
-
 class TestEstimatedStates:
-
     def test_get_estimated_tendon_lengths(self, helix):
         time.sleep(0.3)
         tendon_lengths = helix.get_estimated_tendon_lengths()
