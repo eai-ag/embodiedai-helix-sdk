@@ -1,12 +1,5 @@
 import roslibpy
-from enum import Enum
 from typing import Optional, List, Dict, Any
-
-class ControlMode(Enum):
-    NONE = "none"
-    POSITION_CONTROL = "position_control"
-    CURRENT_CONTROL = "current_control"
-    VELOCITY_CONTROL = "velocity_control"
 
 class Helix:
     def __init__(self, host: str, port: int = 9090):
@@ -14,7 +7,6 @@ class Helix:
         self.port = port
         self.client: Optional[roslibpy.Ros] = None
         self._set_control_mode_service: Optional[roslibpy.Service] = None
-        self._get_control_mode_service: Optional[roslibpy.Service] = None
 
         self._cmd_cartesian_pub: Optional[roslibpy.Topic] = None
         self._cmd_configuration_pub: Optional[roslibpy.Topic] = None
@@ -33,7 +25,7 @@ class Helix:
             self.client = roslibpy.Ros(host=self.host, port=self.port)
             self.client.run(timeout=timeout)
 
-            self._current_mode: Optional[ControlMode] = None
+            self._current_mode: Optional[str] = None
             self._set_control_mode_service = roslibpy.Service(self.client,'/helix/dynamixel_driver_node/set_control_mode','helix_interfaces/SetString')
 
             self._cmd_cartesian_pub = roslibpy.Topic(self.client,'/helix/command/cartesian','geometry_msgs/Pose')
@@ -66,7 +58,7 @@ class Helix:
             self.client.close()
             self.client = None
 
-            self._control_mode_service = None
+            self._set_control_mode_service = None
 
             self._cmd_cartesian_pub = None
             self._cmd_configuration_pub = None
@@ -85,28 +77,23 @@ class Helix:
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
         try:
-            control_mode = ControlMode(mode)
-        except ValueError:
-            valid_modes = [m.value for m in ControlMode]
-            raise ValueError(f"Invalid control mode '{mode}'. Valid modes: {valid_modes}")
-
-        try:
             request = roslibpy.ServiceRequest({'data': mode})
-            response = self._control_mode_service.call(request, timeout=5.0)
+            response = self._set_control_mode_service.call(request, timeout=5.0)
 
             if response.get('success', False):
-                self._current_mode = control_mode
+                self._current_mode = mode
                 return True
             else:
-                print(f"Failed to switch mode: {response.get('message', 'Unknown error')}")
-                return False
+                error_message = response.get('message', 'Unknown error')
+                raise RuntimeError(f"Failed to switch control mode: {error_message}")
 
+        except RuntimeError:
+            raise
         except Exception as e:
-            print(f"Error switching control mode: {e}")
-            return False
+            raise RuntimeError(f"Error switching control mode: {e}")
 
     def _check_position_control(self):
-        if self._current_mode != ControlMode.POSITION_CONTROL:
+        if self._current_mode != "position_control":
             raise RuntimeError("Commands can only be sent in position_control mode")
 
 
