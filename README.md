@@ -1,6 +1,6 @@
 # Embodied AI Helix SDK
 
-Python SDK for controlling the Helix continuum robot via ROS bridge.
+Python SDK for controlling the Helix continuum robot.
 
 ## Overview
 
@@ -135,46 +135,6 @@ rotation = pose['transform']['rotation']
 print(f"qx: {rotation['x']}, qy: {rotation['y']}, qz: {rotation['z']}, qw: {rotation['w']}")
 ```
 
-
-
-## Arming the Robot
-
-When initialized (blue button), the robot can be moved to its calibration pose (blinking blue) and put into RUNNING state (green button) in two ways:
-1. **Manually**: Press the button when initialized
-2. **Programmatically**: Use the `arm()` method
-
-
-```python
-# Connect to robot
-helix = Helix("eai-helix-0.local")
-helix.connect()
-
-# Check initial state
-if helix.is_initialized():
-    print("Robot is initialized but not armed")
-
-# Arm the robot (equivalent to pressing the button)
-helix.arm()  # Moves to calibration pose, takes ~10 seconds
-
-# Verify running state
-if helix.is_running():
-    print("Robot is armed and ready for commands")
-
-    # Execute motion commands
-    helix.command_cartesian(
-        position=[0.0, 0.0, 0.5],
-        orientation=[0.0, 0.0, 0.0, 1.0]
-    )
-
-# Disarm when done (equivalent to pressing the button)
-helix.disarm()  # Returns to INITIALIZED state
-
-# Disconnect
-helix.disconnect()
-```
-
-
-
 ## Commanding Robot Motion
 
 > **Important**: Motion commands are only executed when the robot is in RUNNING state (green button).
@@ -266,6 +226,42 @@ helix.command_cartesian(
 
 
 
+## Arming the Robot
+
+When initialized (blue button), the robot can be moved to its calibration pose (blinking blue) and put into RUNNING state (green button) in two ways:
+1. **Manually**: Press the button when initialized
+2. **Programmatically**: Use the `arm()` method
+
+
+```python
+# Connect to robot
+helix = Helix("eai-helix-0.local")
+helix.connect()
+
+# Check initial state
+if helix.is_initialized():
+    print("Robot is initialized but not armed")
+
+# Arm the robot (equivalent to pressing the button)
+helix.arm()  # Moves to calibration pose, takes ~10 seconds
+
+# Verify running state
+if helix.is_running():
+    print("Robot is armed and ready for commands")
+
+    # Execute motion commands
+    helix.command_cartesian(
+        position=[0.0, 0.0, 0.5],
+        orientation=[0.0, 0.0, 0.0, 1.0]
+    )
+
+# Disarm when done (equivalent to pressing the button)
+helix.disarm()  # Returns to INITIALIZED state
+
+# Disconnect
+helix.disconnect()
+```
+
 
 ## API Reference
 
@@ -306,6 +302,13 @@ All methods return a dictionary with `interface_names` (list of strings) and `va
 | `command_tendon_lengths(interface_names, values)` | `interface_names`: List[str]<br>`values`: List[float] | Command tendon lengths in meters |
 | `command_configuration(interface_names, values)` | `interface_names`: List[str]<br>`values`: List[float] | Command configuration parameters (dx, dy, l) |
 | `command_cartesian(position, orientation)` | `position`: [x, y, z]<br>`orientation`: [qx, qy, qz, qw] | Command end-effector pose |
+
+
+## Troubleshooting
+
+
+
+
 
 
 
