@@ -99,7 +99,6 @@ class Helix:
         except Exception as e:
             raise RuntimeError(e)
 
-
     def command_configuration(self, interface_names: List[str], values: List[float]) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
@@ -188,7 +187,7 @@ class Helix:
 
         if self._system_state == "INITIALIZED":
             self._publish_button_command()
-        elif self._system_state == "RUNNING": 
+        elif self._system_state == "RUNNING":
             print(f"System is already running.")
         else:
             print(f"System can only be armed when in INITIALIZED state. Current state: {self._system_state}")
