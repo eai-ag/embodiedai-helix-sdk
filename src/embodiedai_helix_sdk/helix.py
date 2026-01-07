@@ -1,6 +1,7 @@
 import roslibpy
 from typing import Optional, List, Dict, Any
 
+
 class Helix:
     def __init__(self, host: str, port: int = 9090):
         self.host = host
@@ -26,19 +27,19 @@ class Helix:
             self.client.run(timeout=timeout)
 
             self._current_mode: Optional[str] = None
-            self._set_control_mode_service = roslibpy.Service(self.client,'/helix/dynamixel_driver_node/set_control_mode','helix_interfaces/SetString')
+            self._set_control_mode_service = roslibpy.Service(self.client, "/helix/dynamixel_driver_node/set_control_mode", "helix_interfaces/SetString")
 
-            self._cmd_cartesian_pub = roslibpy.Topic(self.client,'/helix/command/cartesian','geometry_msgs/Pose')
-            self._cmd_configuration_pub = roslibpy.Topic(self.client,'/helix/command/configuration','control_msgs/InterfaceValue')
-            self._cmd_tendon_lengths_pub = roslibpy.Topic(self.client,'/helix/command/tendon_lengths','control_msgs/InterfaceValue')
+            self._cmd_cartesian_pub = roslibpy.Topic(self.client, "/helix/command/cartesian", "geometry_msgs/Pose")
+            self._cmd_configuration_pub = roslibpy.Topic(self.client, "/helix/command/configuration", "control_msgs/InterfaceValue")
+            self._cmd_tendon_lengths_pub = roslibpy.Topic(self.client, "/helix/command/tendon_lengths", "control_msgs/InterfaceValue")
 
-            self._estimated_cartesian_sub = roslibpy.Topic(self.client,'/helix/estimated/cartesian','geometry_msgs/TransformStamped')
+            self._estimated_cartesian_sub = roslibpy.Topic(self.client, "/helix/estimated/cartesian", "geometry_msgs/TransformStamped")
             self._estimated_cartesian_sub.subscribe(self._cartesian_callback)
 
-            self._estimated_configuration_sub = roslibpy.Topic(self.client,'/helix/estimated/configuration','control_msgs/InterfaceValue')
+            self._estimated_configuration_sub = roslibpy.Topic(self.client, "/helix/estimated/configuration", "control_msgs/InterfaceValue")
             self._estimated_configuration_sub.subscribe(self._configuration_callback)
 
-            self._estimated_tendon_lengths_sub = roslibpy.Topic(self.client,'/helix/estimated/tendon_lengths','control_msgs/InterfaceValue')
+            self._estimated_tendon_lengths_sub = roslibpy.Topic(self.client, "/helix/estimated/tendon_lengths", "control_msgs/InterfaceValue")
             self._estimated_tendon_lengths_sub.subscribe(self._tendon_lengths_callback)
 
             return self.is_connected()
@@ -71,29 +72,26 @@ class Helix:
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
 
-
     def set_control_mode(self, mode: str) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
         try:
-            request = roslibpy.ServiceRequest({'data': mode})
+            request = roslibpy.ServiceRequest({"data": mode})
             response = self._set_control_mode_service.call(request, timeout=5.0)
 
-            if response.get('success', False):
+            if response.get("success", False):
                 self._current_mode = mode
                 return True
             else:
-                error_message = response.get('message', 'Unknown error')
+                error_message = response.get("message", "Unknown error")
                 raise RuntimeError(error_message)
         except Exception as e:
             raise RuntimeError(e)
 
-
     def _check_position_control(self):
         if self._current_mode != "position_control":
             raise RuntimeError("Commands can only be sent in position_control mode")
-
 
     def command_configuration(self, interface_names: List[str], values: List[float]) -> bool:
         if not self.is_connected():
@@ -105,10 +103,7 @@ class Helix:
             raise ValueError("interface_names and values must have the same length")
 
         try:
-            message = {
-                'interface_names': interface_names,
-                'values': values
-            }
+            message = {"interface_names": interface_names, "values": values}
             self._cmd_configuration_pub.publish(roslibpy.Message(message))
             return True
         except Exception as e:
@@ -125,10 +120,7 @@ class Helix:
             raise ValueError("interface_names and values must have the same length")
 
         try:
-            message = {
-                'interface_names': interface_names,
-                'values': values
-            }
+            message = {"interface_names": interface_names, "values": values}
             self._cmd_tendon_lengths_pub.publish(roslibpy.Message(message))
             return True
         except Exception as e:
@@ -148,24 +140,19 @@ class Helix:
 
         try:
             message = {
-                'position': {
-                    'x': position[0],
-                    'y': position[1],
-                    'z': position[2]
+                "position": {"x": position[0], "y": position[1], "z": position[2]},
+                "orientation": {
+                    "x": orientation[0],
+                    "y": orientation[1],
+                    "z": orientation[2],
+                    "w": orientation[3],
                 },
-                'orientation': {
-                    'x': orientation[0],
-                    'y': orientation[1],
-                    'z': orientation[2],
-                    'w': orientation[3]
-                }
             }
             self._cmd_cartesian_pub.publish(roslibpy.Message(message))
             return True
         except Exception as e:
             print(f"Error sending cartesian command: {e}")
             return False
-
 
     def _cartesian_callback(self, message):
         self._latest_cartesian = message
@@ -184,7 +171,6 @@ class Helix:
 
     def get_estimated_tendon_lengths(self) -> Optional[Dict[str, float]]:
         return self._latest_tendon_lengths
-
 
     def __repr__(self) -> str:
         status = "connected" if self.is_connected() else "disconnected"
