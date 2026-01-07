@@ -137,25 +137,49 @@ print(f"qx: {rotation['x']}, qy: {rotation['y']}, qz: {rotation['z']}, qw: {rota
 
 
 
-## Commanding Robot Motion
+## Arming the Robot
 
-**Important**: Motion commands are only executed when the robot is in RUNNING state (green button).
+When initialized (blue button), the robot can be moved to its calibration pose (blinking blue) and put into RUNNING state (green button) in two ways:
+1. **Manually**: Press the button when initialized
+2. **Programmatically**: Use the `arm()` method
 
-The robot can be put into running state either through pushing the button when initialized (Blue to green). There is a convenience method to programatically move the robot to its calibration pose. 
 
 ```python
-robot connect
-robot is initialized()
-robot arm <- this does the same as pushing the button
-robot is running
+# Connect to robot
+helix = Helix("eai-helix-0.local")
+helix.connect()
 
-robot execute command
+# Check initial state
+if helix.is_initialized():
+    print("Robot is initialized but not armed")
 
-robot disarm <- this does the same as pushing the button
-robot disconnect
+# Arm the robot (equivalent to pressing the button)
+helix.arm()  # Moves to calibration pose, takes ~10 seconds
+
+# Verify running state
+if helix.is_running():
+    print("Robot is armed and ready for commands")
+
+    # Execute motion commands
+    helix.command_cartesian(
+        position=[0.0, 0.0, 0.5],
+        orientation=[0.0, 0.0, 0.0, 1.0]
+    )
+
+# Disarm when done (equivalent to pressing the button)
+helix.disarm()  # Returns to INITIALIZED state
+
+# Disconnect
+helix.disconnect()
 ```
 
 
+
+## Commanding Robot Motion
+
+> **Important**: Motion commands are only executed when the robot is in RUNNING state (green button).
+
+### Command Abstraction Levels
 
 The robot accepts commands at three levels of abstraction. 
 
