@@ -118,7 +118,7 @@ helix.command_tendon_lengths(
 )
 ```
 
-Note when commanding values over the limits of tendons, they will be clamped by the robot. The limits of the tendons are XXX, XXX, XXX. You can check if you violate the lengths in the Debug window of the webinterface.
+Commands exceeding tendon limits are clamped to valid ranges. Segment 0 tendons (0-2): 0.08-0.125m, segments 1-2 tendons (3-8): 0.18-0.25m. Violations are logged and visible in the Debug window.
 
 
 ### Configuration Commands
@@ -145,7 +145,7 @@ helix.command_configuration(
 )
 ```
 
-note, when commanding configurations that exceed the limit of the tendons, the robot will automatically clamp the commanded configurations.  You can check if you violate the lengths in the Debug window of the webinterface.
+Commands producing tendon lengths exceeding limits are scaled proportionally to fit within constraints. Violations are logged and visible in the Debug window.
 
 
 ### Cartesian Commands
@@ -161,7 +161,7 @@ helix.command_cartesian(
 helix.disarm()
 ```
 
-When the target pose is not reachable, the robot tries to go as close as possible to the pose by clamping the tendon lenghts.
+Unreachable poses are handled through inverse kinematics, with resulting configurations scaled proportionally and tendon commands clamped to stay within physical limits.
 
 
 
