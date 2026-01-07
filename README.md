@@ -301,14 +301,6 @@ All methods return a dictionary with `interface_names` (list of strings) and `va
 | `command_cartesian(position, orientation)` | `position`: [x, y, z]<br>`orientation`: [qx, qy, qz, qw] | Command end-effector pose |
 
 
-## Troubleshooting
-
-
-
-
-
-
-
 ## License
 
 Proprietary - Embodied AI
