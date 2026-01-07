@@ -91,8 +91,6 @@ class TestEstimatedStates:
         assert all(axis in rotation for axis in ["x", "y", "z", "w"])
 
 
-
-
 class TestTendonLengthCommands:
     def test_send_tendon_length_command(self, helix):
         interface_names = ["tendon6", "tendon7", "tendon8"]
@@ -100,7 +98,6 @@ class TestTendonLengthCommands:
 
         result = helix.command_tendon_lengths(interface_names, values)
         assert result is True
-
 
     def test_send_tendon_length_command_when_disarmed(self, helix):
         time.sleep(0.3)
@@ -129,9 +126,8 @@ class TestTendonLengthCommands:
         for name in interface_names:
             assert abs(final_values[name] - initial_values[name]) < tolerance, f"{name} moved when disarmed"
 
-
     def test_send_tendon_length_command_when_armed(self, helix):
-        time.sleep(0.3)        
+        time.sleep(0.3)
         if not helix.is_running():
             helix.arm()
             time.sleep(7.0)
@@ -166,6 +162,147 @@ class TestTendonLengthCommands:
         time.sleep(0.5)
 
 
+class TestConfigurationCommands:
+    def test_send_configuration_command(self, helix):
+        interface_names = ["segment1_dx", "segment1_dy", "segment1_l"]
+        values = [0.0, 0.0, 0.22]
+
+        result = helix.command_configuration(interface_names, values)
+        assert result is True
+
+    def test_send_configuration_command_when_disarmed(self, helix):
+        time.sleep(0.3)
+        if helix.is_running():
+            helix.disarm()
+            time.sleep(5.0)
+
+        initial_config = helix.get_estimated_configuration()
+        assert initial_config is not None
+
+        initial_values = dict(zip(initial_config["interface_names"], initial_config["values"]))
+
+        interface_names = ["segment1_dx", "segment1_dy", "segment1_l"]
+        commanded_values = [0.01, 0.01, 0.22]
+
+        result = helix.command_configuration(interface_names, commanded_values)
+        assert result is True
+
+        time.sleep(0.5)
+        final_config = helix.get_estimated_configuration()
+        assert final_config is not None
+
+        final_values = dict(zip(final_config["interface_names"], final_config["values"]))
+
+        tolerance = 0.005
+        for name in interface_names:
+            assert abs(final_values[name] - initial_values[name]) < tolerance, f"{name} moved when disarmed"
+
+    def test_send_configuration_command_when_armed(self, helix):
+        time.sleep(0.3)
+        if not helix.is_running():
+            helix.arm()
+            time.sleep(7.0)
+
+        assert helix.is_running() is True
+
+        initial_config = helix.get_estimated_configuration()
+        assert initial_config is not None
+
+        initial_values = dict(zip(initial_config["interface_names"], initial_config["values"]))
+
+        interface_names = ["segment1_dx", "segment1_dy", "segment1_l"]
+        commanded_values = [0.05, 0.05, 0.2]
+
+        result = helix.command_configuration(interface_names, commanded_values)
+        assert result is True
+
+        time.sleep(5.0)
+        final_config = helix.get_estimated_configuration()
+        assert final_config is not None
+
+        final_values = dict(zip(final_config["interface_names"], final_config["values"]))
+
+        for name, cmd_val in zip(interface_names, commanded_values):
+            initial_error = abs(initial_values[name] - cmd_val)
+            final_error = abs(final_values[name] - cmd_val)
+            assert final_error < initial_error, f"{name} not moving towards commanded value"
+
+        helix.disarm()
+        time.sleep(0.5)
+
+
+class TestCartesianCommands:
+    def test_send_cartesian_command(self, helix):
+        position = [0.0, 0.0, 0.5]
+        orientation = [0.0, 0.0, 0.0, 1.0]
+
+        result = helix.command_cartesian(position, orientation)
+        assert result is True
+
+    def test_send_cartesian_command_when_disarmed(self, helix):
+        time.sleep(0.3)
+        if helix.is_running():
+            helix.disarm()
+            time.sleep(6.0)
+
+        initial_cartesian = helix.get_estimated_cartesian()
+        assert initial_cartesian is not None
+
+        initial_translation = initial_cartesian["transform"]["translation"]
+        initial_pos = [initial_translation["x"], initial_translation["y"], initial_translation["z"]]
+
+        position = [0.0, 0.0, 0.6]
+        orientation = [0.0, 0.0, 0.0, 1.0]
+
+        result = helix.command_cartesian(position, orientation)
+        assert result is True
+
+        time.sleep(0.5)
+        final_cartesian = helix.get_estimated_cartesian()
+        assert final_cartesian is not None
+
+        final_translation = final_cartesian["transform"]["translation"]
+        final_pos = [final_translation["x"], final_translation["y"], final_translation["z"]]
+
+        tolerance = 0.005
+        for i in range(3):
+            assert abs(final_pos[i] - initial_pos[i]) < tolerance, f"Position axis {i} moved when disarmed"
+
+    def test_send_cartesian_command_when_armed(self, helix):
+        time.sleep(0.3)
+        if not helix.is_running():
+            helix.arm()
+            time.sleep(7.0)
+
+        assert helix.is_running() is True
+
+        initial_cartesian = helix.get_estimated_cartesian()
+        assert initial_cartesian is not None
+
+        initial_translation = initial_cartesian["transform"]["translation"]
+        initial_pos = [initial_translation["x"], initial_translation["y"], initial_translation["z"]]
+
+        commanded_position = [0.1, 0.1, 0.6]
+        commanded_orientation = [0.0, 0.0, 0.0, 1.0]
+
+        result = helix.command_cartesian(commanded_position, commanded_orientation)
+        assert result is True
+
+        time.sleep(4.0)
+        final_cartesian = helix.get_estimated_cartesian()
+        assert final_cartesian is not None
+
+        final_translation = final_cartesian["transform"]["translation"]
+        final_pos = [final_translation["x"], final_translation["y"], final_translation["z"]]
+
+        for i in range(3):
+            initial_error = abs(initial_pos[i] - commanded_position[i])
+            final_error = abs(final_pos[i] - commanded_position[i])
+            assert final_error < initial_error, f"Position axis {i} not moving towards commanded value"
+
+        helix.disarm()
+        time.sleep(0.5)
+
 
 # TODO:
 # pre-commit linting/formatting ?
@@ -173,150 +310,6 @@ class TestTendonLengthCommands:
 # github linting in branches before release
 # release and publish to pypi? or how to install the SDK?
 # tests
-#    discard commands when not in operation mode <- todo 2
-#    check if commands converge <- todo 1
 #    define behavior when going over limits
 # Flaky connection to the robot?
 # CPU/memory usage on the robot
-
-
-
-# class TestConfigurationCommands:
-#     def test_send_configuration_command(self, helix):
-#         helix.set_control_mode("position_control")
-#         time.sleep(0.5)
-
-#         interface_names = ["segment1_dx", "segment1_dy", "segment1_l"]
-#         values = [0.0, 0.0, 0.22]
-
-#         result = helix.command_configuration(interface_names, values)
-#         assert result is True
-
-#     def test_configuration_requires_position_control(self, helix):
-#         helix.set_control_mode("none")
-#         time.sleep(0.5)
-
-#         interface_names = ["segment1_dx", "segment1_dy", "segment1_l"]
-#         values = [0.0, 0.0, 0.22]
-
-#         with pytest.raises(RuntimeError, match="position_control mode"):
-#             helix.command_configuration(interface_names, values)
-
-    # def test_configuration_command_execution(self, helix):
-    #     helix.set_control_mode("position_control")
-    #     time.sleep(0.5)
-
-    #     interface_names = ["segment1_dx", "segment1_dy", "segment1_l"]
-    #     commanded_values = [0.01, 0.02, 0.23]
-
-    #     result = helix.command_configuration(interface_names, commanded_values)
-    #     assert result is True
-
-    #     tolerance = 0.01
-    #     max_wait_time = 5.0
-    #     poll_interval = 0.2
-    #     start_time = time.time()
-
-    #     values_match = False
-    #     while time.time() - start_time < max_wait_time:
-    #         time.sleep(poll_interval)
-
-    #         estimated_config = helix.get_estimated_configuration()
-    #         assert estimated_config is not None
-    #         assert "interface_names" in estimated_config
-    #         assert "values" in estimated_config
-
-    #         estimated_names = estimated_config["interface_names"]
-    #         estimated_vals = estimated_config["values"]
-
-    #         all_match = True
-    #         for cmd_name, cmd_value in zip(interface_names, commanded_values):
-    #             if cmd_name not in estimated_names:
-    #                 all_match = False
-    #                 break
-
-    #             idx = estimated_names.index(cmd_name)
-    #             estimated_value = estimated_vals[idx]
-
-    #             if abs(estimated_value - cmd_value) > tolerance:
-    #                 all_match = False
-    #                 break
-
-    #         if all_match:
-    #             values_match = True
-    #             break
-
-    #     assert values_match, f"Configuration values did not converge within {max_wait_time}s"
-
-
-
-# class TestCartesianCommands:
-#     def test_send_cartesian_command(self, helix):
-#         helix.set_control_mode("position_control")
-#         time.sleep(0.5)
-
-#         position = [0.1, 0.2, 0.3]
-#         orientation = [0.0, 0.0, 0.0, 1.0]
-
-#         result = helix.command_cartesian(position, orientation)
-#         assert result is True
-
-#     def test_cartesian_requires_position_control(self, helix):
-#         helix.set_control_mode("none")
-#         time.sleep(0.5)
-
-#         position = [0.1, 0.2, 0.3]
-#         orientation = [0.0, 0.0, 0.0, 1.0]
-
-#         with pytest.raises(RuntimeError, match="position_control mode"):
-#             helix.command_cartesian(position, orientation)
-
-    # def test_cartesian_command_execution(self, helix):
-    #     helix.set_control_mode("position_control")
-    #     time.sleep(0.5)
-
-    #     commanded_position = [0.15, 0.25, 0.35]
-    #     commanded_orientation = [0.0, 0.0, 0.0, 1.0]
-
-    #     result = helix.command_cartesian(commanded_position, commanded_orientation)
-    #     assert result is True
-
-    #     tolerance = 0.01
-    #     max_wait_time = 5.0
-    #     poll_interval = 0.2
-    #     start_time = time.time()
-
-    #     values_match = False
-    #     while time.time() - start_time < max_wait_time:
-    #         time.sleep(poll_interval)
-
-    #         estimated_cartesian = helix.get_estimated_cartesian()
-    #         assert estimated_cartesian is not None
-    #         assert "transform" in estimated_cartesian
-    #         assert "translation" in estimated_cartesian["transform"]
-    #         assert "rotation" in estimated_cartesian["transform"]
-
-    #         translation = estimated_cartesian["transform"]["translation"]
-    #         rotation = estimated_cartesian["transform"]["rotation"]
-
-    #         assert all(axis in translation for axis in ["x", "y", "z"])
-    #         assert all(axis in rotation for axis in ["x", "y", "z", "w"])
-
-    #         position_match = (
-    #             abs(translation["x"] - commanded_position[0]) <= tolerance
-    #             and abs(translation["y"] - commanded_position[1]) <= tolerance
-    #             and abs(translation["z"] - commanded_position[2]) <= tolerance
-    #         )
-
-    #         orientation_match = (
-    #             abs(rotation["x"] - commanded_orientation[0]) <= tolerance
-    #             and abs(rotation["y"] - commanded_orientation[1]) <= tolerance
-    #             and abs(rotation["z"] - commanded_orientation[2]) <= tolerance
-    #             and abs(rotation["w"] - commanded_orientation[3]) <= tolerance
-    #         )
-
-    #         if position_match and orientation_match:
-    #             values_match = True
-    #             break
-
-    #     assert values_match, f"Cartesian pose did not converge within {max_wait_time}s"
