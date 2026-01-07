@@ -136,12 +136,9 @@ print(f"qx: {rotation['x']}, qy: {rotation['y']}, qz: {rotation['z']}, qw: {rota
 ```
 
 ## Commanding Robot Motion
+The robot accepts commands at three levels of abstraction. 
 
 > **Important**: Motion commands are only executed when the robot is in RUNNING state (green button).
-
-### Command Abstraction Levels
-
-The robot accepts commands at three levels of abstraction. 
 
 ### Tendon Length Commands
 
