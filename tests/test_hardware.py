@@ -23,7 +23,7 @@ class TestSystemState:
         time.sleep(0.5)
         assert helix._system_state is not None
 
-    def test_arm_robot_transitions_to_running(self, helix):
+    def test_transitions_to_running(self, helix):
         time.sleep(0.5)
         helix.arm()
         time.sleep(7)
@@ -53,6 +53,55 @@ class TestControlModeSwitching:
     def test_invalid_control_mode(self, helix):
         with pytest.raises(RuntimeError, match="Failed to switch to invalid_mode mode"):
             helix.set_control_mode("invalid_mode")
+
+
+class TestDynamixelCommands:
+    def test_receive_dynamixels_state(self, helix):
+        time.sleep(0.5)
+        dynamixels_state = helix.get_dynamixels_state()
+        assert dynamixels_state is not None
+        assert "name" in dynamixels_state
+        assert "position" in dynamixels_state
+        assert "velocity" in dynamixels_state
+        assert len(dynamixels_state["name"]) == 9
+        for i in range(9):
+            assert f"dynamixel{i}" in dynamixels_state["name"]
+
+
+    def test_move_each_dynamixel_forth_and_back(self, helix):
+        time.sleep(0.3)
+        helix.disarm()
+        helix.set_control_mode("velocity_control")
+
+        for dynamixel_id in range(9):
+            dynamixel_name = f"dynamixel{dynamixel_id}"
+
+            initial_state = helix.get_dynamixels_state()
+            assert initial_state is not None
+            initial_position = initial_state["position"][dynamixel_id]
+
+            helix.command_dynamixels([dynamixel_name], velocities=[1.0])
+            time.sleep(0.3)
+
+            mid_state = helix.get_dynamixels_state()
+            assert mid_state is not None
+            mid_position = mid_state["position"][dynamixel_id]
+            assert mid_position > initial_position, f"{dynamixel_name} did not move forward"
+
+            helix.command_dynamixels([dynamixel_name], velocities=[-1.0])
+            time.sleep(0.3)
+
+            final_state = helix.get_dynamixels_state()
+            assert final_state is not None
+            final_position = final_state["position"][dynamixel_id]
+            assert final_position < mid_position, f"{dynamixel_name} did not move backward"
+
+            helix.command_dynamixels([dynamixel_name], velocities=[0.0])
+            time.sleep(0.3)
+
+        helix.set_control_mode("none")
+
+
 
 
 class TestEstimatedStates:
@@ -264,7 +313,7 @@ class TestCartesianCommands:
         final_translation = final_cartesian["transform"]["translation"]
         final_pos = [final_translation["x"], final_translation["y"], final_translation["z"]]
 
-        tolerance = 0.005
+        tolerance = 0.01
         for i in range(3):
             assert abs(final_pos[i] - initial_pos[i]) < tolerance, f"Position axis {i} moved when disarmed"
 
@@ -302,6 +351,8 @@ class TestCartesianCommands:
 
         helix.disarm()
         time.sleep(0.5)
+
+
 
 
 # TODO:

@@ -13,16 +13,19 @@ class Helix:
         self._cmd_configuration_pub: Optional[roslibpy.Topic] = None
         self._cmd_tendon_lengths_pub: Optional[roslibpy.Topic] = None
         self._cmd_button_pub: Optional[roslibpy.Topic] = None
+        self._cmd_dynamixels_pub: Optional[roslibpy.Topic] = None
 
         self._estimated_cartesian_sub: Optional[roslibpy.Topic] = None
         self._estimated_configuration_sub: Optional[roslibpy.Topic] = None
         self._estimated_tendon_lengths_sub: Optional[roslibpy.Topic] = None
         self._system_state_sub: Optional[roslibpy.Topic] = None
+        self._dynamixels_state_sub: Optional[roslibpy.Topic] = None
 
         self._latest_cartesian: Optional[Dict] = None
         self._latest_configuration: Optional[Dict] = None
         self._latest_tendon_lengths: Optional[Dict] = None
         self._system_state: Optional[str] = None
+        self._latest_dynamixels_state: Optional[Dict] = None
 
     def connect(self, timeout: float = 5.0) -> bool:
         try:
@@ -35,6 +38,7 @@ class Helix:
             self._cmd_configuration_pub = roslibpy.Topic(self.client, "/helix/command/configuration", "control_msgs/InterfaceValue")
             self._cmd_tendon_lengths_pub = roslibpy.Topic(self.client, "/helix/command/tendon_lengths", "control_msgs/InterfaceValue")
             self._cmd_button_pub = roslibpy.Topic(self.client, "/helix/state/button", "std_msgs/Trigger")
+            self._cmd_dynamixels_pub = roslibpy.Topic(self.client, "/helix/command/dynamixels", "sensor_msgs/JointState")
 
             self._estimated_tendon_lengths_sub = roslibpy.Topic(self.client, "/helix/estimated/tendon_lengths", "control_msgs/InterfaceValue")
             self._estimated_tendon_lengths_sub.subscribe(self._tendon_lengths_callback)
@@ -47,6 +51,9 @@ class Helix:
 
             self._system_state_sub = roslibpy.Topic(self.client, "/helix/state/system_state", "std_msgs/String")
             self._system_state_sub.subscribe(self._system_state_callback)
+
+            self._dynamixels_state_sub = roslibpy.Topic(self.client, "/helix/state/dynamixels", "sensor_msgs/JointState")
+            self._dynamixels_state_sub.subscribe(self._dynamixels_state_callback)
 
             return self.is_connected()
         except Exception as e:
@@ -63,6 +70,8 @@ class Helix:
                 self._estimated_tendon_lengths_sub.unsubscribe()
             if self._system_state_sub:
                 self._system_state_sub.unsubscribe()
+            if self._dynamixels_state_sub:
+                self._dynamixels_state_sub.unsubscribe()
 
             self.client.close()
             self.client = None
@@ -73,11 +82,13 @@ class Helix:
             self._cmd_configuration_pub = None
             self._cmd_tendon_lengths_pub = None
             self._cmd_button_pub = None
+            self._cmd_dynamixels_pub = None
 
             self._estimated_cartesian_sub = None
             self._estimated_configuration_sub = None
             self._estimated_tendon_lengths_sub = None
             self._system_state_sub = None
+            self._dynamixels_state_sub = None
 
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
@@ -91,7 +102,6 @@ class Helix:
             response = self._set_control_mode_service.call(request, timeout=5.0)
 
             if response.get("success", False):
-                # self._current_mode = mode
                 return True
             else:
                 error_message = response.get("message", "Unknown error")
@@ -154,6 +164,35 @@ class Helix:
             print(f"Error sending cartesian command: {e}")
             return False
 
+    def command_dynamixels(self, names: List[str], positions: Optional[List[float]] = None, velocities: Optional[List[float]] = None, efforts: Optional[List[float]] = None) -> bool:
+        if not self.is_connected():
+            raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        if not names:
+            raise ValueError("names must not be empty")
+
+        if positions and len(names) != len(positions):
+            raise ValueError("names and positions must have the same length")
+        if velocities and len(names) != len(velocities):
+            raise ValueError("names and velocities must have the same length")
+        if efforts and len(names) != len(efforts):
+            raise ValueError("names and efforts must have the same length")
+
+        try:
+            message = {"name": names}
+            if positions is not None:
+                message["position"] = positions
+            if velocities is not None:
+                message["velocity"] = velocities
+            if efforts is not None:
+                message["effort"] = efforts
+
+            self._cmd_dynamixels_pub.publish(roslibpy.Message(message))
+            return True
+        except Exception as e:
+            print(f"Error sending dynamixel command: {e}")
+            return False
+
     def _cartesian_callback(self, message):
         self._latest_cartesian = message
 
@@ -166,6 +205,9 @@ class Helix:
     def _system_state_callback(self, message):
         self._system_state = message.get("data")
 
+    def _dynamixels_state_callback(self, message):
+        self._latest_dynamixels_state = message
+
     def get_estimated_cartesian(self) -> Optional[Dict[str, Any]]:
         return self._latest_cartesian
 
@@ -174,6 +216,9 @@ class Helix:
 
     def get_estimated_tendon_lengths(self) -> Optional[Dict[str, float]]:
         return self._latest_tendon_lengths
+
+    def get_dynamixels_state(self) -> Optional[Dict[str, Any]]:
+        return self._latest_dynamixels_state
 
     def _publish_button_command(self):
         if not self.is_connected():
