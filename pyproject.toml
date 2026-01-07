@@ -27,3 +27,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "--disable-plugin-autoload"
+
+
+[tool.ruff]
+line-length = 180
