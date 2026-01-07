@@ -1,6 +1,14 @@
 # Embodied AI Helix SDK
 
-Python SDK for controlling the Helix continuum robot via ROS bridge (roslibpy).
+Python SDK for controlling the Helix continuum robot via ROS bridge.
+
+## Overview
+
+Embodied AI's Helix manipulator is a cable-driven continuum robot with three independently controllable segments. This SDK provides three levels of control abstraction:
+
+- **Tendon Space**: Direct control of the 9 tendons (3 per segment)
+- **Configuration Space**: Control each segment's curvature (dx, dy) and length (l)
+- **Cartesian Space**: Control the end-effector pose (position + orientation)
 
 ## Installation
 
@@ -15,16 +23,25 @@ cd embodiedai-helix-sdk
 pip install -e .
 ```
 
+## Hardware Setup
 
+Follow these steps to prepare the robot:
+
+1. **Power on** - Plug in and turn on the robot
+   - Status: Button glows **white** (booting)
+
+2. **Wait for initialization**
+   - Status: Button turns **blue** (initialized)
+
+3. **Move to calibration pose** - Press button
+   - Status: Button blinks **blue** (restoring calibration pose)
+
+4. **Robot is running**
+   - Status: Button turns **green** (ready for commands)
+
+> **Note**: The robot must be in RUNNING state (green button) to accept motion commands.
 
 ## Quick Start
-
-Hardware preparation
-Plugin/power/turn on the robot: robot is booting (button is white)  
-
-Wait until it switches from booting to initalized (button is blue): all nodes are started and runnig (though the robot was not put into calibration pose.)  
-
-Press the button to restore the calibration pose (button blinks blue) and transition to running state (button is green).
 
 ```python
 from embodiedai_helix_sdk import Helix
@@ -33,135 +50,194 @@ from embodiedai_helix_sdk import Helix
 helix = Helix("eai-helix-0.local")
 helix.connect()
 
-# Command the robot in cartesian space
+# Command end-effector pose
 helix.command_cartesian(
-    interface_names=['x???', ???'],
-    values=[0.0, 0.0, 0.22]
+    position=[0.0, 0.0, 0.5],              # x, y, z in meters
+    orientation=[0.0, 0.0, 0.0, 1.0]      # quaternion [x, y, z, w]
 )
 
-# Read cartesian pose
-config = helix.XXX()
-print(f"Current pose: {config}")
+# Read current pose
+pose = helix.get_estimated_cartesian()
+print(f"Position: {pose['transform']['translation']}")
+print(f"Orientation: {pose['transform']['rotation']}")
 
+# Disconnect
 helix.disconnect()
 ```
 
 
 ## Reading Robot State
 
+The robot provides state feedback at three levels of abstraction.
 
 ### Tendon Lengths
 
-Each segment is controlled by three tendons. segment 0 through tendons with ids 0 1 2. seg 1 with 3 4 5 and seg 2 with 6 7 8
+The lowest-level representation: individual tendon lengths in meters.
+
+**Tendon mapping**:
+- Segment 0: tendons 0, 1, 2
+- Segment 1: tendons 3, 4, 5
+- Segment 2: tendons 6, 7, 8
 
 ```python
 tendons = helix.get_estimated_tendon_lengths()
-# Returns: {'interface_names': ['tendon0', 'tendon1', ...], 'values': [...]}
+# Returns: {'interface_names': ['tendon0', 'tendon1', ..., 'tendon8'],
+#           'values': [0.095, 0.098, ...]}
 
-# All 9 tendons: tendon0 through tendon8
+# Access individual tendon
+names = tendons['interface_names']
+values = tendons['values']
+tendon0_length = values[names.index('tendon0')]
 ```
 
 ### Configuration Space
 
-Add description here what the configuraiton space is: dx and dy represent the curvature in the x axis and y axis, l represents the segment length. the configuration is computed based on the tendon lenghts. the robot is composed of three segments with ids 0, 1 and 2. 
+Mid-level representation: each segment's bending and length.
+
+**Parameters per segment**:
+- `dx`: Curvature in the x-axis (radians)
+- `dy`: Curvature in the y-axis (radians)
+- `l`: Segment length (meters)
+
+The configuration is computed from tendon lengths using the constant curvature model.
 
 ```python
 config = helix.get_estimated_configuration()
-# Returns: {'interface_names': ['segment0_dx', 'segment0_dy', ...], 'values': [...]}
+# Returns: {'interface_names': ['segment0_dx', 'segment0_dy', 'segment0_l',
+#                                'segment1_dx', 'segment1_dy', 'segment1_l',
+#                                'segment2_dx', 'segment2_dy', 'segment2_l'],
+#           'values': [0.05, 0.02, 0.12, ...]}
 
-# Access specific values
+# Access specific segment values
 names = config['interface_names']
 values = config['values']
 segment1_dx = values[names.index('segment1_dx')]
+segment1_dy = values[names.index('segment1_dy')]
+segment1_l = values[names.index('segment1_l')]
 ```
 
 ### Cartesian Pose
 
-From the concatenation of the configuration of the robot's three segments 0,1,2 we can compute and obtain the cartesian pose of the robot's tip/end effector. 
+Highest-level representation: end-effector position and orientation in 3D space.
+
+The pose is computed via forward kinematics from the configuration of all three segments.
 
 ```python
 pose = helix.get_estimated_cartesian()
 # Returns: TransformStamped message as dict
 
-translation = pose['transform']['translation']  # {'x': ..., 'y': ..., 'z': ...}
-rotation = pose['transform']['rotation']        # {'x': ..., 'y': ..., 'z': ..., 'w': ...} (quaternion)
+# Access position (meters)
+translation = pose['transform']['translation']
+print(f"x: {translation['x']}, y: {translation['y']}, z: {translation['z']}")
+
+# Access orientation (quaternion)
+rotation = pose['transform']['rotation']
+print(f"qx: {rotation['x']}, qy: {rotation['y']}, qz: {rotation['z']}, qw: {rotation['w']}")
 ```
 
 
 
-## Control Robot State
+## Commanding Robot Motion
 
-In RUNNIG  state (green button)  the robot can be controlled through tendon length, configuration and cartesian commands.  
-**Important**: These high-level commands are only executed when the robot is in RUNNING state (armed).
+**Important**: Motion commands are only executed when the robot is in RUNNING state (green button).
 
-### Tendon Lenght Commands
-
-It is possible to control individual tendons or a subset of tendons or all tendons together. 
+The robot can be put into running state either through pushing the button when initialized (Blue to green). There is a convenience method to programatically move the robot to its calibration pose. 
 
 ```python
-# single tendon
+robot connect
+robot is initialized()
+robot arm <- this does the same as pushing the button
+robot is running
+
+robot execute command
+
+robot disarm <- this does the same as pushing the button
+robot disconnect
+```
+
+
+
+The robot accepts commands at three levels of abstraction. 
+
+### Tendon Length Commands
+
+Lowest-level control: directly specify target lengths for individual tendons.
+
+You can command a single tendon, a subset, or all tendons together.
+
+```python
+# Control single tendon
 helix.command_tendon_lengths(
     interface_names=['tendon6'],
     values=[0.24]
 )
 
-# subset of tendons
+# Control one segment (tendons 6, 7, 8)
 helix.command_tendon_lengths(
     interface_names=['tendon6', 'tendon7', 'tendon8'],
     values=[0.24, 0.23, 0.19]
 )
 
-# all tendons
+# Control all tendons
 helix.command_tendon_lengths(
-    interface_names=['tendon6', 'tendon7', 'tendon8', 'tendon6', 'tendon7', 'tendon8','tendon6', 'tendon7', 'tendon8'],
-    values=[0.24, 0.23, 0.19]
+    interface_names=['tendon0', 'tendon1', 'tendon2',
+                     'tendon3', 'tendon4', 'tendon5',
+                     'tendon6', 'tendon7', 'tendon8'],
+    values=[0.10, 0.11, 0.12,
+            0.20, 0.21, 0.22,
+            0.24, 0.23, 0.19]
 )
 ```
 
-Commands exceeding tendon limits are clamped to valid ranges. Segment 0 tendons (0-2): 0.08-0.125m, segments 1-2 tendons (3-8): 0.18-0.25m. Violations are logged and visible in the Debug window.
+**Limit handling**: Commands exceeding physical limits are clamped to valid ranges.
+- Segment 0 tendons (0-2): 0.08 - 0.125 m
+- Segment 1-2 tendons (3-8): 0.18 - 0.25 m
 
+Violations trigger warnings visible in the robot's Debug logs.
 
 ### Configuration Commands
 
-The segments can be commanded independetly or combined, but if any segment is controlled all values must be set.
+Mid-level control: specify each segment's curvature and length.
+
+Each segment requires all three parameters (dx, dy, l). Segments can be commanded independently or together.
 
 ```python
-# Controlling segment 1: Possible
+# Control single segment
 helix.command_configuration(
     interface_names=['segment1_dx', 'segment1_dy', 'segment1_l'],
     values=[0.05, 0.05, 0.2]
 )
 
-# Controlling all segments: Possible
+# Control all segments
 helix.command_configuration(
-    interface_names=['segment1_dx', 'segment1_dy', 'segment1_l', 'segment1_dx', 'segment1_dy', 'segment1_l', 'segment1_dx', 'segment1_dy', 'segment1_l'],
-    values=[0.05, 0.05, 0.2, 0.05, 0.05, 0.2, 0.05, 0.05, 0.2]
-)
-
-# Controlling segment partially: NOT possible
-helix.command_configuration(
-    interface_names=['segment1_dx'],
-    values=[0.05]
+    interface_names=['segment0_dx', 'segment0_dy', 'segment0_l',
+                     'segment1_dx', 'segment1_dy', 'segment1_l',
+                     'segment2_dx', 'segment2_dy', 'segment2_l'],
+    values=[0.02, 0.01, 0.12,
+            0.05, 0.05, 0.20,
+            0.03, 0.04, 0.23]
 )
 ```
 
-Commands producing tendon lengths exceeding limits are scaled proportionally to fit within constraints. Violations are logged and visible in the Debug window.
+**Limit handling**: If the commanded configuration produces tendon lengths exceeding limits, all tendons in that segment are scaled proportionally to fit within constraints. Violations trigger warnings.
 
+> **Note**: Partial segment control (e.g., only `segment1_dx`) is not supported. All three parameters must be specified.
 
 ### Cartesian Commands
-Send a target pose for the end effector
+
+Highest-level control: specify the desired end-effector pose.
+
+The system uses inverse kinematics to compute the required configuration and tendon commands.
 
 ```python
-# Command Cartesian pose
+# Command target pose
 helix.command_cartesian(
-    position=[0.0, 0.0, 0.6],
-    orientation=[0.0, 0.0, 0.0, 1.0]  # Quaternion [x, y, z, w]
+    position=[0.0, 0.0, 0.6],           # [x, y, z] in meters
+    orientation=[0.0, 0.0, 0.0, 1.0]    # [qx, qy, qz, qw] quaternion
 )
-
-helix.disarm()
 ```
 
-Unreachable poses are handled through inverse kinematics, with resulting configurations scaled proportionally and tendon commands clamped to stay within physical limits.
+**Limit handling**: The IK solver computes a configuration as close as possible to the target. The resulting configuration is then scaled if needed, and tendon commands are clamped to physical limits. The robot will achieve the closest reachable pose.
 
 
 
@@ -169,50 +245,49 @@ Unreachable poses are handled through inverse kinematics, with resulting configu
 
 ## API Reference
 
-### Connection
+### Connection Management
 
 | Method | Description |
 |--------|-------------|
-| `Helix(host, port=9090)` | Create a Helix robot instance |
-| `connect(timeout=5.0) -> bool` | Connect to the robot. Returns True if successful |
-| `disconnect()` | Disconnect from the robot |
-| `is_connected() -> bool` | Check if connected to robot |
+| `Helix(host, port=9090)` | Create connection to Helix robot |
+| `connect(timeout=5.0) -> bool` | Establish connection. Returns `True` if successful |
+| `disconnect()` | Close connection to robot |
+| `is_connected() -> bool` | Check connection status |
 
-### System State
+### System State Management
 
 | Method | Description |
 |--------|-------------|
-| `arm()` | Arm the robot (INITIALIZED → RUNNING). Takes up to 10 seconds to restore the robot's calibration pose |
-| `disarm()` | Disarm the robot (RUNNING → INITIALIZED) |
-| `is_running() -> bool` | Check if robot is in RUNNING state |
-| `is_initialized() -> bool` | Check if robot is in INITIALIZED state |
+| `arm()` | Transition to RUNNING state. Moves robot to calibration pose (~10s) |
+| `disarm()` | Transition to INITIALIZED state. Stops accepting motion commands |
+| `is_running() -> bool` | Check if robot is armed and ready for commands |
+| `is_initialized() -> bool` | Check if robot is initialized but not armed |
 
-### State Reading
+### State Feedback
+
+All methods return a dictionary with `interface_names` (list of strings) and `values` (list of floats).
 
 | Method | Returns |
 |--------|---------|
-| `get_estimated_configuration()` | Dict with `interface_names` and `values` for configuration space |
-| `get_estimated_tendon_lengths()` | Dict with `interface_names` and `values` for tendon lengths |
-| `get_estimated_cartesian()` | Dict with TransformStamped message (translation and rotation) |
+| `get_estimated_tendon_lengths()` | Current tendon lengths (tendon0-tendon8) in meters |
+| `get_estimated_configuration()` | Current configuration (dx, dy, l for each segment) |
+| `get_estimated_cartesian()` | Current end-effector pose (TransformStamped with translation and rotation) |
 
+### Motion Commands
 
-### Control Commands
+> **Requirement**: Robot must be armed (RUNNING state) to execute motion commands.
 
-**Note**: These commands require the robot to be armed (RUNNING state).
-
-| Method | Description |
-|--------|-------------|
-| `command_configuration(interface_names: List[str], values: List[float]) -> bool` | Command configuration space (dx, dy, L for each segment) |
-| `command_tendon_lengths(interface_names: List[str], values: List[float]) -> bool` | Command individual tendon lengths (tendon0-tendon8) |
-| `command_cartesian(position: List[float], orientation: List[float]) -> bool` | Command end-effector pose. Position: [x, y, z], Orientation: [x, y, z, w] quaternion |
-
-
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `command_tendon_lengths(interface_names, values)` | `interface_names`: List[str]<br>`values`: List[float] | Command tendon lengths in meters |
+| `command_configuration(interface_names, values)` | `interface_names`: List[str]<br>`values`: List[float] | Command configuration parameters (dx, dy, l) |
+| `command_cartesian(position, orientation)` | `position`: [x, y, z]<br>`orientation`: [qx, qy, qz, qw] | Command end-effector pose |
 
 
 
 ## License
 
-[Add license information]
+Proprietary - Embodied AI
 
 
 
