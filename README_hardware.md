@@ -1,133 +1,163 @@
+# Helix Hardware Reference
 
-
-# Additional infos
+Additional information about the Helix robot hardware, system states, and features.
 
 ## Robot Operational States
 
-The Helix robot operates in different system states:
+The Helix robot uses button LED colors to indicate its current state:
 
-Booting: white: starting systems
-blue: initalized- **INITIALIZED**: Robot is ready, but tendon lengths are not calibrated. in order to command tendon lenghts, configuration or cartestian, the robot must restore its calibration pose.
+| Button Color | State | Description |
+|--------------|-------|-------------|
+| **White** | BOOTING | System is starting up, ROS nodes are launching |
+| **Blue** | INITIALIZED | System ready, but robot is not in calibration pose. Commands will not execute until calibration pose is restored. |
+| **Blinking Blue** | RESTORING_CALIBRATION | Robot is moving to calibration pose (~10 seconds) |
+| **Green** | RUNNING | Robot is calibrated and will execute motion commands |
+| **Blinking Red** | ERROR | System error detected to prevent overload or protect hardware |
+| **Solid Red** | EMERGENCY_STOP | Emergency button is pressed, all motion halted |
 
-blue blinking: restoring calibration pose. - **RESTORING_CALIBRATION_POSE**: Robot is returning to calibration pose.
+### State Transitions
 
-running: green - **RUNNING**: Robot is active and will execute commands.
+**Normal startup sequence:**
+1. Power on → BOOTING (white)
+2. System ready → INITIALIZED (blue)
+3. Press button → RESTORING_CALIBRATION (blinking blue)
+4. Calibration complete → RUNNING (green)
 
-Error: blinking red
-Emergency button: solid red
+**From RUNNING to INITIALIZED:**
+- Press button while in RUNNING state
+- Call `helix.disarm()` via SDK
+- Emergency button pressed and released
 
-### Error states
+### Error States
 
-Errors occur to prevent overload and protect the system. When the system experiences an error it goes to the error state. 
+When an error occurs in the system, the robot enters ERROR state (blinking red).
 
-### Emergency button
-pushing the emergency button interrupts the execution of any further commands, the robots remains in its current pose.
+**Recovery from error:**
+- Press the button to acknowledge and clear the error
+- Robot returns to INITIALIZED state
+- Press button again to restore calibration and return to RUNNING
 
-when releasing the emergency button, the robot goes back t initialized state and through pushing the button is restores the calibration pose and becomes operational again.
+### Emergency Stop
+
+The emergency button provides immediate motion interruption:
+
+**When pressed (solid red):**
+- All motor commands are blocked
+- Robot maintains current pose
+- System remains powered
+
+**When released:**
+- Robot transitions to INITIALIZED state (blue)
+- Press button to restore calibration pose and return to RUNNING
+- Motion commands can be executed again once RUNNING
 
 
 ## Connectivity
 
-You can connect to the robot via Ethernet. It is discoverable on a local network by its name: eai-helix-X.local (e.g. eai-helix-0.local). 
+The Helix robot connects via Ethernet and can be accessed through multiple addressing methods.
 
-Each robot is also configured to have a static IP address; 192.168.238.10X (.e.g 192.168.238.101).
+### Connection Methods
 
-In addition, each robot tries to obatin a dynamic ip address via DHCP lease. You need to ask your network administrator to find it's dyamic IP address. 
+**1. Hostname (Recommended)**
+```python
+helix = Helix("eai-helix-0.local")
+```
+- Each robot is discoverable via mDNS/Bonjour using the hostname pattern: `eai-helix-X.local`
+- Example: `eai-helix-0.local`, `eai-helix-1.local`, etc.
+- Works automatically on most networks without configuration
+
+**2. Static IP Address**
+```python
+helix = Helix("192.168.238.101")
+```
+- Each robot has a preconfigured static IP: `192.168.238.10X`
+- Example: Robot 1 → `192.168.238.101`, Robot 2 → `192.168.238.102`
+- Use this if hostname resolution fails or for direct point-to-point connections
+
+**3. DHCP Dynamic IP**
+- Robots also request a dynamic IP via DHCP when connected to a network
+- Consult your network administrator or router's DHCP lease table to find the assigned IP
+- Use this method for integration into managed networks
 
 
-## Web interface
 
-The robot hosts a web interface that you can use to inspect it. Open 
-http://robot-address or name.local, e.g. http://192.168.xx/ or http://eai-helix-0.local/) in Google Chrome or Chromium to open the web interface. 
-In the webinterface you have two tabs (main and debug). main visualizes the current state and let's you publish tendon lenghts, configuration (both through the message panels), and cartesion commands (throught the joysticks at the bottom right)
+## Web Interface
+
+Each Helix robot hosts a built-in web interface for monitoring and manual control.
+
+### Accessing the Web Interface
+
+Open a web browser (Chrome or Chromium recommended) and navigate to:
+- `http://eai-helix-0.local` (using hostname)
+- `http://192.168.238.101` (using static IP)
+
+Replace with your specific robot's hostname or IP address.
+
+### Interface Tabs
+
+**Main Tab**
+- **Status visualization**: Current robot state, button color, and system health
+- **State feedback**: Real-time display of tendon lengths, configuration, and cartesian pose
+- **Manual control panels**:
+  - Tendon length commands (message panel)
+  - Configuration commands (message panel)
+  - Cartesian commands (joystick widget in bottom-right)
+
+**Debug Tab**
+- **System logs**: ROS node outputs and warning messages
+- **Limit violations**: Notifications when commands exceed tendon limits
+- **Calibration tools**: Start and finish calibration procedures (see Calibration section)
+- **Advanced diagnostics**: Motor states, communication status, error details
+
+### Use Cases
+
+- **Monitoring**: View real-time robot state without writing code
+- **Manual testing**: Send commands through UI controls to test workspace limits
+- **Debugging**: Check logs for limit violations or system errors
+- **Calibration**: Perform recalibration procedures when needed
 
 
 ## Calibration
 
-The robot comes pre-calibrated, i.e. when pressing the button or calling the arm() method, the robot goes to a straight configuraiton. However, it can be necessary to recalibrate this initial pose. This is possible through the web interface. 
-Open the web interface, go to the debug tab, and click start calibration.. the motors are now under a little bit of tension. you can manually put the robot into a straight configuration. once in a straight configuration, you can click the finish_calibration button to store this new calibration pose.
+The Helix robot comes pre-calibrated from the factory. The calibration defines the "home pose" - a straight configuration that the robot returns to when armed.
+
+### When to Recalibrate
+
+Recalibration may be necessary if:
+- Tendons have been replaced or adjusted
+- Robot doesn't return to a straight pose when armed
+- Motors have been reconfigured or replaced
+- Significant mechanical changes have been made
+
+### Calibration Procedure
+
+Calibration is performed through the web interface:
+
+1. **Open web interface** and navigate to the **Debug tab**
+
+2. **Click "Start Calibration"**
+   - Motors switch to current control mode with low constant tension (~50mA)
+   - This provides gentle resistance to keep tendons taut without forcing motion
+   - Robot becomes manually compliant - you can now move it by hand
+
+3. **Manually straighten the robot**
+   - Carefully position all three segments into a straight vertical configuration
+   - Ensure tendons have even tension (no slack, but not over-tight)
+   - Take your time to achieve accurate alignment
+
+4. **Click "Finish Calibration"**
+   - System records current motor positions and encoder values
+   - Calibration offsets are saved to persistent storage
+   - Motors return to extended position control mode
+   - Robot is now ready to arm
 
 
+### Verifying Calibration
 
-## Low Level access
+After calibration:
+1. Disarm the robot (if armed)
+2. Press the button to arm the robot
+3. Robot should move to a straight vertical configuration
+4. Check that all segments appear aligned and straight
 
-We allow you to manually bypass almost all our safety mechanism. and the SDK provides you the ability to control the motors directly in different modes: current, velocity, position, extended position. 
-
-The emergency button still stops the robot from any further motion (when pressed).
-
-Note, it is risky to control the robot in these modes as it can lead to uncontrolled unwinding of the tendons. 
-
-
-| Method | Description |
-|--------|-------------|
-| `set_control_mode(mode: str) -> bool` | Set motor control mode. Valid modes: `"none"`, `"position_control"`, `"velocity_control"`, `"current_control"`, `"extended_position_control"` |
-
-
-| Method | Description |
-|--------|-------------|
-| `command_dynamixels(names: List[str], positions=None, velocities=None, efforts=None) -> bool` | Command Dynamixel motors directly. Provide positions, velocities, or efforts based on control mode |
-
-
-| Method | Returns |
-|--------|---------|
-| `get_dynamixels_state()` | Dict with `name`, `position`, `velocity`, and `effort` for all 9 dynamixels | -->
-
-
-
-```python
-# Set control mode for low-level control
-helix.set_control_mode("velocity_control")
-
-# Command dynamixels directly
-helix.command_dynamixels(
-    names=['dynamixel0', 'dynamixel1'],
-    velocities=[1.0, -1.0]
-)
-
-# Command with position (requires position_control mode)
-helix.set_control_mode("position_control")
-helix.command_dynamixels(
-    names=['dynamixel0'],
-    positions=[0.5]
-)
-
-# Command with effort/current (requires current_control mode)
-helix.set_control_mode("current_control")
-helix.command_dynamixels(
-    names=['dynamixel0'],
-    efforts=[100.0]  # Current in mA
-)
-
-# Reset to no control
-helix.set_control_mode("none")
-```
-
-**Available Control Modes**:
-- `"none"`: No motor control
-- `"position_control"`: Position control mode
-- `"velocity_control"`: Velocity control mode
-- `"current_control"`: Current/effort control mode
-- `"extended_position_control"`: Extended position control (multi-turn)
-
-
-
-```python
-dynamixels = helix.get_dynamixels_state()
-# Returns: {'name': ['dynamixel0', ...], 'position': [...], 'velocity': [...], 'effort': [...]}
-
-# Access individual dynamixel state
-dynamixel_id = 0
-position = dynamixels['position'][dynamixel_id]
-velocity = dynamixels['velocity'][dynamixel_id]
-effort = dynamixels['effort'][dynamixel_id]
-``` 
-
-
-
-
-
-
-
-
-
-
+If the robot doesn't achieve a straight pose, repeat the calibration procedure.
