@@ -221,6 +221,32 @@ helix.command_cartesian(
 **Limit handling**: The IK solver computes a configuration as close as possible to the target. The resulting configuration is then scaled if needed, and tendon commands are clamped to physical limits. The robot will achieve the closest reachable pose.
 
 
+## Camera Integration
+
+The simplest way to view the live camera feed is using a media player, like VLC:
+
+```bash
+vlc tcp://eai-helix-0.local:5000
+```
+
+### Capturing Images
+
+The SDK provides built-in support for capturing images from the Helix robot's camera stream.
+
+```python
+from embodiedai_helix_sdk import Helix
+
+helix = Helix("eai-helix-0.local")
+helix.connect()
+
+image = helix.get_image()
+
+if image:
+    image.show()
+    image.save("capture.jpg")
+
+helix.disconnect()
+```
 
 
 ## Arming the Robot
@@ -268,7 +294,7 @@ helix.disconnect()
 |--------|-------------|
 | `Helix(host, port=9090)` | Create connection to Helix robot |
 | `connect(timeout=5.0) -> bool` | Establish connection. Returns `True` if successful |
-| `disconnect()` | Close connection to robot |
+| `disconnect()` | Close connection to robot and camera |
 | `is_connected() -> bool` | Check connection status |
 
 ### System State Management
@@ -289,6 +315,12 @@ All methods return a dictionary with `interface_names` (list of strings) and `va
 | `get_estimated_tendon_lengths()` | Current tendon lengths (tendon0-tendon8) in meters |
 | `get_estimated_configuration()` | Current configuration (dx, dy, l for each segment) |
 | `get_estimated_cartesian()` | Current end-effector pose (TransformStamped with translation and rotation) |
+
+### Camera
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_image()` | PIL.Image.Image or None | Capture a single image from the camera stream |
 
 ### Motion Commands
 
