@@ -223,7 +223,7 @@ helix.command_cartesian(
 
 ## Camera Integration
 
-The simplest way to view the live camera feed is using a media player, like VLC:
+The simplest way to view the live camera feed is using a media player, like [VLC](https://www.videolan.org/):
 
 ```bash
 vlc tcp://eai-helix-0.local:5000
