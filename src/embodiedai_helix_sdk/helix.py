@@ -1,5 +1,8 @@
 import roslibpy
+import socket
 from typing import Optional, List, Dict, Any
+from io import BytesIO
+from PIL import Image
 
 
 class Helix:
@@ -29,6 +32,9 @@ class Helix:
         self._latest_tendon_lengths: Optional[Dict] = None
         self._system_state: Optional[str] = None
         self._latest_dynamixels_state: Optional[Dict] = None
+
+        self._camera_socket: Optional[socket.socket] = None
+        self._camera_buffer: bytes = b""
 
     def connect(self, timeout: float = 5.0) -> bool:
         try:
@@ -60,6 +66,8 @@ class Helix:
 
             self._dynamixels_state_sub = roslibpy.Topic(self.client, "/helix/state/dynamixels", "sensor_msgs/JointState")
             self._dynamixels_state_sub.subscribe(self._dynamixels_state_callback)
+
+            self._connect_camera()
 
             return self.is_connected()
         except Exception as e:
@@ -98,6 +106,11 @@ class Helix:
             self._estimated_tendon_lengths_sub = None
             self._system_state_sub = None
             self._dynamixels_state_sub = None
+
+        if self._camera_socket:
+            self._camera_socket.close()
+            self._camera_socket = None
+            self._camera_buffer = b""
 
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
@@ -311,6 +324,49 @@ class Helix:
 
     def is_initialized(self) -> bool:
         return self._system_state == "INITIALIZED"
+
+    def _connect_camera(self):
+        if self._camera_socket is not None:
+            return
+
+        try:
+            self._camera_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._camera_socket.settimeout(5.0)
+            self._camera_socket.connect((self.host, 5000))
+            self._camera_buffer = b""
+        except Exception as e:
+            print(f"Failed to connect to camera at {self.host}:5000: {e}")
+            if self._camera_socket:
+                self._camera_socket.close()
+                self._camera_socket = None
+
+    def get_image(self):
+        if self._camera_socket is None:
+            return None
+
+        try:
+            while True:
+                chunk = self._camera_socket.recv(4096)
+                if not chunk:
+                    return None
+
+                self._camera_buffer += chunk
+
+                jpeg_start = self._camera_buffer.find(b'\xff\xd8')
+                jpeg_end = self._camera_buffer.find(b'\xff\xd9')
+
+                if jpeg_start != -1 and jpeg_end != -1 and jpeg_end > jpeg_start:
+                    jpeg_data = self._camera_buffer[jpeg_start:jpeg_end + 2]
+                    self._camera_buffer = self._camera_buffer[jpeg_end + 2:]
+                    return Image.open(BytesIO(jpeg_data))
+
+        except Exception as e:
+            print(f"Error capturing image: {e}")
+            if self._camera_socket:
+                self._camera_socket.close()
+                self._camera_socket = None
+                self._camera_buffer = b""
+            return None
 
     def __repr__(self) -> str:
         status = "connected" if self.is_connected() else "disconnected"
