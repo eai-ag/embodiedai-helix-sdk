@@ -8,6 +8,9 @@ class Helix:
         self.port = port
         self.client: Optional[roslibpy.Ros] = None
         self._set_control_mode_service: Optional[roslibpy.Service] = None
+        self._gripper_open_service: Optional[roslibpy.Service] = None
+        self._gripper_close_service: Optional[roslibpy.Service] = None
+        self._gripper_set_position_service: Optional[roslibpy.Service] = None
 
         self._cmd_cartesian_pub: Optional[roslibpy.Topic] = None
         self._cmd_configuration_pub: Optional[roslibpy.Topic] = None
@@ -33,6 +36,9 @@ class Helix:
             self.client.run(timeout=timeout)
 
             self._set_control_mode_service = roslibpy.Service(self.client, "/helix/dynamixel_driver_node/set_control_mode", "helix_interfaces/SetString")
+            self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
+            self._gripper_close_service = roslibpy.Service(self.client, "/helix/gripper/close", "std_srvs/Trigger")
+            self._gripper_set_position_service = roslibpy.Service(self.client, "/helix/gripper/set_position", "helix_interfaces/SetFloat32")
 
             self._cmd_cartesian_pub = roslibpy.Topic(self.client, "/helix/command/cartesian", "geometry_msgs/Pose")
             self._cmd_configuration_pub = roslibpy.Topic(self.client, "/helix/command/configuration", "control_msgs/InterfaceValue")
@@ -77,6 +83,9 @@ class Helix:
             self.client = None
 
             self._set_control_mode_service = None
+            self._gripper_open_service = None
+            self._gripper_close_service = None
+            self._gripper_set_position_service = None
 
             self._cmd_cartesian_pub = None
             self._cmd_configuration_pub = None
@@ -100,6 +109,57 @@ class Helix:
         try:
             request = roslibpy.ServiceRequest({"data": mode})
             response = self._set_control_mode_service.call(request, timeout=5.0)
+
+            if response.get("success", False):
+                return True
+            else:
+                error_message = response.get("message", "Unknown error")
+                raise RuntimeError(error_message)
+        except Exception as e:
+            raise RuntimeError(e)
+
+    def gripper_open(self) -> bool:
+        if not self.is_connected():
+            raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        try:
+            request = roslibpy.ServiceRequest({})
+            response = self._gripper_open_service.call(request, timeout=5.0)
+
+            if response.get("success", False):
+                return True
+            else:
+                error_message = response.get("message", "Unknown error")
+                raise RuntimeError(error_message)
+        except Exception as e:
+            raise RuntimeError(e)
+
+    def gripper_close(self) -> bool:
+        if not self.is_connected():
+            raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        try:
+            request = roslibpy.ServiceRequest({})
+            response = self._gripper_close_service.call(request, timeout=5.0)
+
+            if response.get("success", False):
+                return True
+            else:
+                error_message = response.get("message", "Unknown error")
+                raise RuntimeError(error_message)
+        except Exception as e:
+            raise RuntimeError(e)
+
+    def gripper_set_position(self, position: float) -> bool:
+        if not self.is_connected():
+            raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        if not 0.0 <= position <= 1.0:
+            raise ValueError("position must be between 0.0 (closed) and 1.0 (open)")
+
+        try:
+            request = roslibpy.ServiceRequest({"data": position})
+            response = self._gripper_set_position_service.call(request, timeout=5.0)
 
             if response.get("success", False):
                 return True
