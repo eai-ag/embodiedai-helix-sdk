@@ -1,3 +1,5 @@
+import warnings
+
 import roslibpy
 import socket
 from typing import Optional, List, Dict, Any
@@ -21,17 +23,23 @@ class Helix:
         self._cmd_button_pub: Optional[roslibpy.Topic] = None
         self._cmd_dynamixels_pub: Optional[roslibpy.Topic] = None
 
+        self._ft_sensor_reset_service: Optional[roslibpy.Service] = None
+
         self._estimated_cartesian_sub: Optional[roslibpy.Topic] = None
         self._estimated_configuration_sub: Optional[roslibpy.Topic] = None
         self._estimated_tendon_lengths_sub: Optional[roslibpy.Topic] = None
         self._system_state_sub: Optional[roslibpy.Topic] = None
         self._dynamixels_state_sub: Optional[roslibpy.Topic] = None
+        self._ft_sensor_wrench_sub: Optional[roslibpy.Topic] = None
+        self._ft_sensor_temperature_sub: Optional[roslibpy.Topic] = None
 
         self._latest_cartesian: Optional[Dict] = None
         self._latest_configuration: Optional[Dict] = None
         self._latest_tendon_lengths: Optional[Dict] = None
         self._system_state: Optional[str] = None
         self._latest_dynamixels_state: Optional[Dict] = None
+        self._latest_ft_sensor_wrench: Optional[Dict] = None
+        self._latest_ft_sensor_temperature: Optional[float] = None
 
         self._camera_socket: Optional[socket.socket] = None
         self._camera_buffer: bytes = b""
@@ -45,6 +53,7 @@ class Helix:
             self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
             self._gripper_close_service = roslibpy.Service(self.client, "/helix/gripper/close", "std_srvs/Trigger")
             self._gripper_set_position_service = roslibpy.Service(self.client, "/helix/gripper/set_position", "helix_interfaces/SetFloat32")
+            self._ft_sensor_reset_service = roslibpy.Service(self.client, "/helix/ft_sensor/reset", "std_srvs/Trigger")
 
             self._cmd_cartesian_pub = roslibpy.Topic(self.client, "/helix/command/cartesian", "geometry_msgs/Pose")
             self._cmd_configuration_pub = roslibpy.Topic(self.client, "/helix/command/configuration", "control_msgs/InterfaceValue")
@@ -67,6 +76,12 @@ class Helix:
             self._dynamixels_state_sub = roslibpy.Topic(self.client, "/helix/state/dynamixels", "sensor_msgs/JointState")
             self._dynamixels_state_sub.subscribe(self._dynamixels_state_callback)
 
+            self._ft_sensor_wrench_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/wrench", "geometry_msgs/WrenchStamped")
+            self._ft_sensor_wrench_sub.subscribe(self._ft_sensor_wrench_callback)
+
+            self._ft_sensor_temperature_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/temperature", "sensor_msgs/Temperature")
+            self._ft_sensor_temperature_sub.subscribe(self._ft_sensor_temperature_callback)
+
             self._connect_camera()
 
             return self.is_connected()
@@ -86,6 +101,10 @@ class Helix:
                 self._system_state_sub.unsubscribe()
             if self._dynamixels_state_sub:
                 self._dynamixels_state_sub.unsubscribe()
+            if self._ft_sensor_wrench_sub:
+                self._ft_sensor_wrench_sub.unsubscribe()
+            if self._ft_sensor_temperature_sub:
+                self._ft_sensor_temperature_sub.unsubscribe()
 
             self.client.close()
             self.client = None
@@ -94,6 +113,7 @@ class Helix:
             self._gripper_open_service = None
             self._gripper_close_service = None
             self._gripper_set_position_service = None
+            self._ft_sensor_reset_service = None
 
             self._cmd_cartesian_pub = None
             self._cmd_configuration_pub = None
@@ -106,6 +126,8 @@ class Helix:
             self._estimated_tendon_lengths_sub = None
             self._system_state_sub = None
             self._dynamixels_state_sub = None
+            self._ft_sensor_wrench_sub = None
+            self._ft_sensor_temperature_sub = None
 
         if self._camera_socket:
             self._camera_socket.close()
@@ -116,6 +138,11 @@ class Helix:
         return self.client is not None and self.client.is_connected
 
     def set_control_mode(self, mode: str) -> bool:
+        warnings.warn(
+            "set_control_mode() changes the low-level motor control mode and can damage the robot's tendon mechanism. "
+            "Use with extreme caution.",
+            stacklevel=2,
+        )
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
@@ -238,6 +265,11 @@ class Helix:
             return False
 
     def command_dynamixels(self, names: List[str], positions: Optional[List[float]] = None, velocities: Optional[List[float]] = None, efforts: Optional[List[float]] = None) -> bool:
+        warnings.warn(
+            "command_dynamixels() bypasses the tendon control system and can damage the robot's tendon mechanism. "
+            "Use with extreme caution. Prefer command_tendon_lengths(), command_configuration(), or command_cartesian() instead.",
+            stacklevel=2,
+        )
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
@@ -281,6 +313,18 @@ class Helix:
     def _dynamixels_state_callback(self, message):
         self._latest_dynamixels_state = message
 
+    def _ft_sensor_wrench_callback(self, message):
+        wrench = message.get("wrench", {})
+        force = wrench.get("force", {})
+        torque = wrench.get("torque", {})
+        self._latest_ft_sensor_wrench = {
+            "force": {"x": force.get("x", 0.0), "y": force.get("y", 0.0), "z": force.get("z", 0.0)},
+            "torque": {"x": torque.get("x", 0.0), "y": torque.get("y", 0.0), "z": torque.get("z", 0.0)},
+        }
+
+    def _ft_sensor_temperature_callback(self, message):
+        self._latest_ft_sensor_temperature = message.get("temperature")
+
     def get_estimated_cartesian(self) -> Optional[Dict[str, Any]]:
         return self._latest_cartesian
 
@@ -292,6 +336,28 @@ class Helix:
 
     def get_dynamixels_state(self) -> Optional[Dict[str, Any]]:
         return self._latest_dynamixels_state
+
+    def get_ft_sensor_wrench(self) -> Optional[Dict[str, Any]]:
+        return self._latest_ft_sensor_wrench
+
+    def get_ft_sensor_temperature(self) -> Optional[float]:
+        return self._latest_ft_sensor_temperature
+
+    def ft_sensor_reset(self) -> bool:
+        if not self.is_connected():
+            raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        try:
+            request = roslibpy.ServiceRequest({})
+            response = self._ft_sensor_reset_service.call(request, timeout=5.0)
+
+            if response.get("success", False):
+                return True
+            else:
+                error_message = response.get("message", "Unknown error")
+                raise RuntimeError(error_message)
+        except Exception as e:
+            raise RuntimeError(e)
 
     def _publish_button_command(self):
         if not self.is_connected():

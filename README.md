@@ -312,6 +312,22 @@ All methods return a dictionary with `interface_names` (list of strings) and `va
 | `get_estimated_configuration()` | Current configuration (dx, dy, l for each segment) |
 | `get_estimated_cartesian()` | Current end-effector pose (TransformStamped with translation and rotation) |
 
+### Gripper
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `gripper_open() -> bool` | — | Fully open the gripper |
+| `gripper_close() -> bool` | — | Fully close the gripper |
+| `gripper_set_position(position) -> bool` | `position`: float (0.0–1.0) | Set gripper position. 0.0 = closed, 1.0 = open |
+
+### Force-Torque Sensor
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get_ft_sensor_wrench()` | Dict or None | Force and torque readings: `{"force": {"x", "y", "z"}, "torque": {"x", "y", "z"}}` |
+| `get_ft_sensor_temperature()` | float or None | Sensor temperature in degrees Celsius |
+| `ft_sensor_reset() -> bool` | bool | Tare/reset force-torque sensor offsets to zero |
+
 ### Camera
 
 | Method | Returns | Description |
