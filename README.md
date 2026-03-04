@@ -13,12 +13,7 @@ Embodied AI's Helix robot is a cable-driven continuum robot with three independe
 ## Installation
 
 ```bash
-pip install embodiedai-helix-sdk
-```
-
-Or install from source:
-
-```bash
+git clone git@github.com:eai-ag/embodiedai-helix-sdk.git
 cd embodiedai-helix-sdk
 pip install -e .
 ```
@@ -47,7 +42,7 @@ Follow these steps to prepare the robot:
 from embodiedai_helix_sdk import Helix
 
 # Connect to the robot
-helix = Helix("eai-helix-0.local")
+helix = Helix("eai-helix-pi-0.local")
 helix.connect()
 
 # Command end-effector pose
@@ -75,9 +70,9 @@ The robot provides state feedback at three levels of abstraction.
 The lowest-level representation: individual tendon lengths in meters.
 
 **Tendon mapping**:
-- Segment 0: tendons 0, 1, 2
-- Segment 1: tendons 3, 4, 5
-- Segment 2: tendons 6, 7, 8
+- Segment 0: tendons 0, 1, 2 (closest to base)
+- Segment 1: tendons 3, 4, 5 (middle)
+- Segment 2: tendons 6, 7, 8 (connected to gripper)
 
 ```python
 tendons = helix.get_estimated_tendon_lengths()
@@ -153,9 +148,9 @@ helix.command_tendon_lengths(
     values=[0.24]
 )
 
-# Control one segment (tendons 6, 7, 8)
+# Control all tendons of one segment (tendons 0, 1, 2)
 helix.command_tendon_lengths(
-    interface_names=['tendon6', 'tendon7', 'tendon8'],
+    interface_names=['tendon0', 'tendon1', 'tendon2'],
     values=[0.24, 0.23, 0.19]
 )
 
@@ -164,15 +159,16 @@ helix.command_tendon_lengths(
     interface_names=['tendon0', 'tendon1', 'tendon2',
                      'tendon3', 'tendon4', 'tendon5',
                      'tendon6', 'tendon7', 'tendon8'],
-    values=[0.10, 0.11, 0.12,
-            0.20, 0.21, 0.22,
-            0.24, 0.23, 0.19]
+    values=[0.20, 0.21, 0.22,
+            0.24, 0.23, 0.19,
+            0.10, 0.11, 0.12]
 )
 ```
 
 **Limit handling**: Commands exceeding physical limits are clamped to valid ranges.
-- Segment 0 tendons (0-2): 0.08 - 0.125 m
-- Segment 1-2 tendons (3-8): 0.18 - 0.25 m
+- Segment 0 (Tendons 6-8): 0.08 - 0.125 m
+- Segment 1 (Tendons 3-5): 0.18 - 0.25 m
+- Segment 2 (Tendons 0-2): 0.18 - 0.25 m
 
 Violations trigger warnings visible in the robot's Debug logs.
 
@@ -226,7 +222,7 @@ helix.command_cartesian(
 The simplest way to view the live camera feed is using a media player, like [VLC](https://www.videolan.org/):
 
 ```bash
-vlc tcp://eai-helix-0.local:5000
+vlc tcp://eai-helix-pi-0.local:5000
 ```
 
 ### Capturing Images
@@ -236,7 +232,7 @@ The SDK provides built-in support for capturing images from the Helix robot's ca
 ```python
 from embodiedai_helix_sdk import Helix
 
-helix = Helix("eai-helix-0.local")
+helix = Helix("eai-helix-pi-0.local")
 helix.connect()
 
 image = helix.get_image()
@@ -251,14 +247,14 @@ helix.disconnect()
 
 ## Arming the Robot
 
-When initialized (blue button), the robot can be moved to its calibration pose (blinking blue) and put into RUNNING state (green button) in two ways:
+When initialized (button is blue), the robot can be restored to its calibration pose (blinking blue) and put into RUNNING state (green button) in two ways:
 1. **Manually**: Press the button when initialized
 2. **Programmatically**: Use the `arm()` method
 
 
 ```python
 # Connect to robot
-helix = Helix("eai-helix-0.local")
+helix = Helix("eai-helix-pi-0.local")
 helix.connect()
 
 # Check initial state
@@ -394,10 +390,10 @@ The Helix robot connects via Ethernet and can be accessed through multiple addre
 
 **1. Hostname (Recommended)**
 ```python
-helix = Helix("eai-helix-0.local")
+helix = Helix("eai-helix-pi-0.local")
 ```
-- Each robot is discoverable via mDNS/Bonjour using the hostname pattern: `eai-helix-X.local`
-- Example: `eai-helix-0.local`, `eai-helix-1.local`, etc.
+- Each robot is discoverable via mDNS/Bonjour using the hostname pattern: `eai-helix-pi-X.local`
+- Example: `eai-helix-pi-0.local`, `eai-helix-pi-1.local`, etc.
 - Works automatically on most networks without configuration
 
 **2. Static IP Address**
@@ -422,7 +418,7 @@ Each Helix robot hosts a built-in web interface for monitoring and manual contro
 ### Accessing the Web Interface
 
 Open a web browser (Chrome or Chromium recommended) and navigate to:
-- `http://eai-helix-0.local` (using hostname)
+- `http://eai-helix-pi-0.local` (using hostname)
 - `http://192.168.238.101` (using static IP)
 
 Replace with your specific robot's hostname or IP address.
