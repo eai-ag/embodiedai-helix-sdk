@@ -148,9 +148,9 @@ helix.command_tendon_lengths(
     values=[0.24]
 )
 
-# Control all tendons of one segment (tendons 0, 1, 2)
+# Control one segment (tendons 6, 7, 8)
 helix.command_tendon_lengths(
-    interface_names=['tendon0', 'tendon1', 'tendon2'],
+    interface_names=['tendon6', 'tendon7', 'tendon8'],
     values=[0.24, 0.23, 0.19]
 )
 
@@ -159,16 +159,16 @@ helix.command_tendon_lengths(
     interface_names=['tendon0', 'tendon1', 'tendon2',
                      'tendon3', 'tendon4', 'tendon5',
                      'tendon6', 'tendon7', 'tendon8'],
-    values=[0.20, 0.21, 0.22,
-            0.24, 0.23, 0.19,
-            0.10, 0.11, 0.12]
+    values=[0.10, 0.10, 0.10,
+            0.20, 0.20, 0.20,
+            0.20, 0.20, 0.20]
 )
 ```
 
 **Limit handling**: Commands exceeding physical limits are clamped to valid ranges.
-- Segment 0 (Tendons 6-8): 0.08 - 0.125 m
-- Segment 1 (Tendons 3-5): 0.18 - 0.25 m
-- Segment 2 (Tendons 0-2): 0.18 - 0.25 m
+- Segment 0 tendons (0-2): 0.08 - 0.125 m
+- Segment 1 tendons (3-5): 0.18 - 0.25 m
+- Segment 2 tendons (6-8): 0.18 - 0.25 m
 
 Violations trigger warnings visible in the robot's Debug logs.
 
