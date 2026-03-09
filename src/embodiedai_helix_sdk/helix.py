@@ -1,5 +1,3 @@
-import warnings
-
 import roslibpy
 import socket
 from typing import Optional, List, Dict, Any
@@ -12,7 +10,6 @@ class Helix:
         self.host = host
         self.port = port
         self.client: Optional[roslibpy.Ros] = None
-        self._set_control_mode_service: Optional[roslibpy.Service] = None
         self._gripper_open_service: Optional[roslibpy.Service] = None
         self._gripper_close_service: Optional[roslibpy.Service] = None
         self._gripper_set_position_service: Optional[roslibpy.Service] = None
@@ -21,7 +18,6 @@ class Helix:
         self._cmd_configuration_pub: Optional[roslibpy.Topic] = None
         self._cmd_tendon_lengths_pub: Optional[roslibpy.Topic] = None
         self._cmd_button_pub: Optional[roslibpy.Topic] = None
-        self._cmd_dynamixels_pub: Optional[roslibpy.Topic] = None
 
         self._ft_sensor_reset_service: Optional[roslibpy.Service] = None
 
@@ -49,7 +45,6 @@ class Helix:
             self.client = roslibpy.Ros(host=self.host, port=self.port)
             self.client.run(timeout=timeout)
 
-            self._set_control_mode_service = roslibpy.Service(self.client, "/helix/dynamixel_driver_node/set_control_mode", "helix_interfaces/SetString")
             self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
             self._gripper_close_service = roslibpy.Service(self.client, "/helix/gripper/close", "std_srvs/Trigger")
             self._gripper_set_position_service = roslibpy.Service(self.client, "/helix/gripper/set_position", "helix_interfaces/SetFloat32")
@@ -59,7 +54,6 @@ class Helix:
             self._cmd_configuration_pub = roslibpy.Topic(self.client, "/helix/command/configuration", "control_msgs/InterfaceValue")
             self._cmd_tendon_lengths_pub = roslibpy.Topic(self.client, "/helix/command/tendon_lengths", "control_msgs/InterfaceValue")
             self._cmd_button_pub = roslibpy.Topic(self.client, "/helix/state/button", "std_msgs/Trigger")
-            self._cmd_dynamixels_pub = roslibpy.Topic(self.client, "/helix/command/dynamixels", "sensor_msgs/JointState")
 
             self._estimated_tendon_lengths_sub = roslibpy.Topic(self.client, "/helix/estimated/tendon_lengths", "control_msgs/InterfaceValue")
             self._estimated_tendon_lengths_sub.subscribe(self._tendon_lengths_callback)
@@ -109,7 +103,6 @@ class Helix:
             self.client.close()
             self.client = None
 
-            self._set_control_mode_service = None
             self._gripper_open_service = None
             self._gripper_close_service = None
             self._gripper_set_position_service = None
@@ -119,7 +112,6 @@ class Helix:
             self._cmd_configuration_pub = None
             self._cmd_tendon_lengths_pub = None
             self._cmd_button_pub = None
-            self._cmd_dynamixels_pub = None
 
             self._estimated_cartesian_sub = None
             self._estimated_configuration_sub = None
@@ -136,27 +128,6 @@ class Helix:
 
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
-
-    def set_control_mode(self, mode: str) -> bool:
-        warnings.warn(
-            "set_control_mode() changes the low-level motor control mode and can damage the robot's tendon mechanism. "
-            "Use with extreme caution.",
-            stacklevel=2,
-        )
-        if not self.is_connected():
-            raise ConnectionError("Not connected to robot. Call connect() first.")
-
-        try:
-            request = roslibpy.ServiceRequest({"data": mode})
-            response = self._set_control_mode_service.call(request, timeout=5.0)
-
-            if response.get("success", False):
-                return True
-            else:
-                error_message = response.get("message", "Unknown error")
-                raise RuntimeError(error_message)
-        except Exception as e:
-            raise RuntimeError(e)
 
     def gripper_open(self) -> bool:
         if not self.is_connected():
@@ -262,40 +233,6 @@ class Helix:
             return True
         except Exception as e:
             print(f"Error sending cartesian command: {e}")
-            return False
-
-    def command_dynamixels(self, names: List[str], positions: Optional[List[float]] = None, velocities: Optional[List[float]] = None, efforts: Optional[List[float]] = None) -> bool:
-        warnings.warn(
-            "command_dynamixels() bypasses the tendon control system and can damage the robot's tendon mechanism. "
-            "Use with extreme caution. Prefer command_tendon_lengths(), command_configuration(), or command_cartesian() instead.",
-            stacklevel=2,
-        )
-        if not self.is_connected():
-            raise ConnectionError("Not connected to robot. Call connect() first.")
-
-        if not names:
-            raise ValueError("names must not be empty")
-
-        if positions and len(names) != len(positions):
-            raise ValueError("names and positions must have the same length")
-        if velocities and len(names) != len(velocities):
-            raise ValueError("names and velocities must have the same length")
-        if efforts and len(names) != len(efforts):
-            raise ValueError("names and efforts must have the same length")
-
-        try:
-            message = {"name": names}
-            if positions is not None:
-                message["position"] = positions
-            if velocities is not None:
-                message["velocity"] = velocities
-            if efforts is not None:
-                message["effort"] = efforts
-
-            self._cmd_dynamixels_pub.publish(roslibpy.Message(message))
-            return True
-        except Exception as e:
-            print(f"Error sending dynamixel command: {e}")
             return False
 
     def _cartesian_callback(self, message):

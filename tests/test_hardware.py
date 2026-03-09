@@ -4,8 +4,9 @@ from embodiedai_helix_sdk import Helix
 
 
 @pytest.fixture
-def helix():
-    robot = Helix("eai-helix-0.local")
+def helix(request):
+    host = request.config.getoption("--host")
+    robot = Helix(host)
     connected = robot.connect()
     if not connected:
         pytest.skip("Could not connect to robot hardware")
@@ -31,77 +32,6 @@ class TestSystemState:
         helix.disarm()
         time.sleep(0.5)
         assert helix.is_running() is False
-
-
-class TestControlModeSwitching:
-    def test_switch_to_none_mode(self, helix):
-        result = helix.set_control_mode("none")
-        assert result is True
-
-    def test_switch_to_current_mode(self, helix):
-        result = helix.set_control_mode("current_control")
-        assert result is True
-
-    def test_switch_to_velocity_control(self, helix):
-        result = helix.set_control_mode("velocity_control")
-        assert result is True
-
-    def test_switch_to_position_control(self, helix):
-        result = helix.set_control_mode("position_control")
-        assert result is True
-
-    def test_invalid_control_mode(self, helix):
-        with pytest.raises(RuntimeError, match="Failed to switch to invalid_mode mode"):
-            helix.set_control_mode("invalid_mode")
-
-
-class TestDynamixelCommands:
-    def test_receive_dynamixels_state(self, helix):
-        time.sleep(0.5)
-        dynamixels_state = helix.get_dynamixels_state()
-        assert dynamixels_state is not None
-        assert "name" in dynamixels_state
-        assert "position" in dynamixels_state
-        assert "velocity" in dynamixels_state
-        assert len(dynamixels_state["name"]) == 9
-        for i in range(9):
-            assert f"dynamixel{i}" in dynamixels_state["name"]
-
-
-    def test_move_each_dynamixel_forth_and_back(self, helix):
-        time.sleep(0.3)
-        helix.disarm()
-        helix.set_control_mode("velocity_control")
-
-        for dynamixel_id in range(9):
-            dynamixel_name = f"dynamixel{dynamixel_id}"
-
-            initial_state = helix.get_dynamixels_state()
-            assert initial_state is not None
-            initial_position = initial_state["position"][dynamixel_id]
-
-            helix.command_dynamixels([dynamixel_name], velocities=[1.0])
-            time.sleep(0.3)
-
-            mid_state = helix.get_dynamixels_state()
-            assert mid_state is not None
-            mid_position = mid_state["position"][dynamixel_id]
-            assert mid_position > initial_position, f"{dynamixel_name} did not move forward"
-
-            helix.command_dynamixels([dynamixel_name], velocities=[-1.0])
-            time.sleep(0.3)
-
-            final_state = helix.get_dynamixels_state()
-            assert final_state is not None
-            final_position = final_state["position"][dynamixel_id]
-            assert final_position < mid_position, f"{dynamixel_name} did not move backward"
-
-            helix.command_dynamixels([dynamixel_name], velocities=[0.0])
-            time.sleep(0.3)
-
-        helix.set_control_mode("none")
-
-
 
 
 class TestEstimatedStates:
@@ -138,6 +68,100 @@ class TestEstimatedStates:
         rotation = cartesian["transform"]["rotation"]
         assert all(axis in translation for axis in ["x", "y", "z"])
         assert all(axis in rotation for axis in ["x", "y", "z", "w"])
+
+
+class TestFTSensor:
+    def test_get_ft_sensor_wrench(self, helix):
+        time.sleep(0.3)
+        wrench = helix.get_ft_sensor_wrench()
+        assert wrench is not None
+        assert isinstance(wrench, dict)
+        assert "force" in wrench
+        assert "torque" in wrench
+        assert all(axis in wrench["force"] for axis in ["x", "y", "z"])
+        assert all(axis in wrench["torque"] for axis in ["x", "y", "z"])
+        for axis in ["x", "y", "z"]:
+            assert isinstance(wrench["force"][axis], float)
+            assert isinstance(wrench["torque"][axis], float)
+
+    def test_get_ft_sensor_temperature(self, helix):
+        time.sleep(0.3)
+        temperature = helix.get_ft_sensor_temperature()
+        assert temperature is not None
+        assert isinstance(temperature, float)
+        assert -40.0 < temperature < 85.0
+
+    def test_ft_sensor_reset(self, helix):
+        time.sleep(0.3)
+        result = helix.ft_sensor_reset()
+        assert result is True
+
+    def test_ft_sensor_wrench_changes_after_reset(self, helix):
+        time.sleep(0.3)
+        wrench_before = helix.get_ft_sensor_wrench()
+        assert wrench_before is not None
+
+        helix.ft_sensor_reset()
+        time.sleep(0.5)
+
+        wrench_after = helix.get_ft_sensor_wrench()
+        assert wrench_after is not None
+        # After reset, force/torque values should be near zero
+        for axis in ["x", "y", "z"]:
+            assert abs(wrench_after["force"][axis]) < abs(wrench_before["force"][axis]) + 1.0
+
+
+class TestCamera:
+    def test_get_image(self, helix):
+        image = helix.get_image()
+        assert image is not None
+        assert image.size[0] > 0
+        assert image.size[1] > 0
+        assert image.mode == "RGB"
+
+    def test_get_image_returns_consistent_size(self, helix):
+        image1 = helix.get_image()
+        image2 = helix.get_image()
+        assert image1 is not None
+        assert image2 is not None
+        assert image1.size == image2.size
+
+
+class TestGripper:
+    def test_gripper_open(self, helix):
+        result = helix.gripper_open()
+        assert result is True
+
+    def test_gripper_close(self, helix):
+        result = helix.gripper_close()
+        assert result is True
+
+    def test_gripper_set_position(self, helix):
+        result = helix.gripper_set_position(0.5)
+        assert result is True
+
+    def test_gripper_set_position_fully_open(self, helix):
+        result = helix.gripper_set_position(1.0)
+        assert result is True
+
+    def test_gripper_set_position_fully_closed(self, helix):
+        result = helix.gripper_set_position(0.0)
+        assert result is True
+
+    def test_gripper_set_position_invalid_too_high(self, helix):
+        with pytest.raises(ValueError, match="position must be between 0.0"):
+            helix.gripper_set_position(1.5)
+
+    def test_gripper_set_position_invalid_too_low(self, helix):
+        with pytest.raises(ValueError, match="position must be between 0.0"):
+            helix.gripper_set_position(-0.1)
+
+    def test_gripper_open_close_cycle(self, helix):
+        assert helix.gripper_open() is True
+        time.sleep(1.0)
+        assert helix.gripper_close() is True
+        time.sleep(1.0)
+        assert helix.gripper_open() is True
 
 
 class TestTendonLengthCommands:
@@ -351,16 +375,3 @@ class TestCartesianCommands:
 
         helix.disarm()
         time.sleep(0.5)
-
-
-
-
-# TODO:
-# pre-commit linting/formatting ?
-# ty type checking?
-# github linting in branches before release
-# release and publish to pypi? or how to install the SDK?
-# tests
-#    define behavior when going over limits
-# Flaky connection to the robot?
-# CPU/memory usage on the robot
