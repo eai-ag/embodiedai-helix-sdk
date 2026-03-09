@@ -13,7 +13,7 @@ Embodied AI's Helix robot is a cable-driven continuum robot with three independe
 ## Installation
 
 ```bash
-git clone git@github.com:eai-ag/embodiedai-helix-sdk.git
+git clone https://github.com/eai-ag/embodiedai-helix-sdk.git
 cd embodiedai-helix-sdk
 # You might need to run: 'pip install --upgrade pip' before you run the following command
 pip install -e .
