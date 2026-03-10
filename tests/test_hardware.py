@@ -96,10 +96,8 @@ class TestFTSensor:
         result = helix.ft_sensor_reset()
         assert result is True
 
-    def test_ft_sensor_wrench_changes_after_reset(self, helix):
+    def test_ft_sensor_wrench_near_zero_after_reset(self, helix):
         time.sleep(0.3)
-        wrench_before = helix.get_ft_sensor_wrench()
-        assert wrench_before is not None
 
         helix.ft_sensor_reset()
         time.sleep(0.5)
@@ -108,7 +106,8 @@ class TestFTSensor:
         assert wrench_after is not None
         # After reset, force/torque values should be near zero
         for axis in ["x", "y", "z"]:
-            assert abs(wrench_after["force"][axis]) < abs(wrench_before["force"][axis]) + 1.0
+            assert abs(wrench_after["force"][axis]) < 1.0, f"force.{axis} not near zero after reset"
+            assert abs(wrench_after["torque"][axis]) < 1.0, f"torque.{axis} not near zero after reset"
 
 
 class TestCamera:
