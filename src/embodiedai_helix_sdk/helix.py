@@ -1,7 +1,5 @@
 import roslibpy
-import socket
 from typing import Optional, List, Dict, Any
-from io import BytesIO
 from PIL import Image
 
 
@@ -37,8 +35,7 @@ class Helix:
         self._latest_ft_sensor_wrench: Optional[Dict] = None
         self._latest_ft_sensor_temperature: Optional[float] = None
 
-        self._camera_socket: Optional[socket.socket] = None
-        self._camera_buffer: bytes = b""
+        self._camera_capture = None  # cv2.VideoCapture for H264 stream
 
     def connect(self, timeout: float = 5.0) -> bool:
         try:
@@ -121,10 +118,9 @@ class Helix:
             self._ft_sensor_wrench_sub = None
             self._ft_sensor_temperature_sub = None
 
-        if self._camera_socket:
-            self._camera_socket.close()
-            self._camera_socket = None
-            self._camera_buffer = b""
+        if self._camera_capture:
+            self._camera_capture.release()
+            self._camera_capture = None
 
     def is_connected(self) -> bool:
         return self.client is not None and self.client.is_connected
@@ -329,46 +325,38 @@ class Helix:
         return self._system_state == "INITIALIZED"
 
     def _connect_camera(self):
-        if self._camera_socket is not None:
+        if self._camera_capture is not None:
             return
 
         try:
-            self._camera_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._camera_socket.settimeout(5.0)
-            self._camera_socket.connect((self.host, 5000))
-            self._camera_buffer = b""
+            import cv2
+            self._camera_capture = cv2.VideoCapture(f"tcp://{self.host}:5000", cv2.CAP_FFMPEG)
+            if not self._camera_capture.isOpened():
+                print(f"Failed to open camera stream at tcp://{self.host}:5000")
+                self._camera_capture.release()
+                self._camera_capture = None
         except Exception as e:
             print(f"Failed to connect to camera at {self.host}:5000: {e}")
-            if self._camera_socket:
-                self._camera_socket.close()
-                self._camera_socket = None
+            if self._camera_capture:
+                self._camera_capture.release()
+                self._camera_capture = None
 
     def get_image(self):
-        if self._camera_socket is None:
+        if self._camera_capture is None:
             return None
 
         try:
-            while True:
-                chunk = self._camera_socket.recv(4096)
-                if not chunk:
-                    return None
-
-                self._camera_buffer += chunk
-
-                jpeg_start = self._camera_buffer.find(b'\xff\xd8')
-                jpeg_end = self._camera_buffer.find(b'\xff\xd9')
-
-                if jpeg_start != -1 and jpeg_end != -1 and jpeg_end > jpeg_start:
-                    jpeg_data = self._camera_buffer[jpeg_start:jpeg_end + 2]
-                    self._camera_buffer = self._camera_buffer[jpeg_end + 2:]
-                    return Image.open(BytesIO(jpeg_data))
-
+            import cv2
+            ret, frame = self._camera_capture.read()
+            if not ret or frame is None:
+                return None
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            return Image.fromarray(rgb)
         except Exception as e:
             print(f"Error capturing image: {e}")
-            if self._camera_socket:
-                self._camera_socket.close()
-                self._camera_socket = None
-                self._camera_buffer = b""
+            if self._camera_capture:
+                self._camera_capture.release()
+                self._camera_capture = None
             return None
 
     def __repr__(self) -> str:
