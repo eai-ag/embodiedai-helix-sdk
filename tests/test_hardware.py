@@ -130,22 +130,27 @@ class TestGripper:
     def test_gripper_open(self, helix):
         result = helix.gripper_open()
         assert result is True
+        time.sleep(1.0)
 
     def test_gripper_close(self, helix):
         result = helix.gripper_close()
         assert result is True
+        time.sleep(1.0)
 
     def test_gripper_set_position(self, helix):
         result = helix.gripper_set_position(0.5)
         assert result is True
+        time.sleep(1.0)
 
     def test_gripper_set_position_fully_open(self, helix):
         result = helix.gripper_set_position(1.0)
         assert result is True
+        time.sleep(1.0)
 
     def test_gripper_set_position_fully_closed(self, helix):
         result = helix.gripper_set_position(0.0)
         assert result is True
+        time.sleep(1.0)
 
     def test_gripper_set_position_invalid_too_high(self, helix):
         with pytest.raises(ValueError, match="position must be between 0.0"):
