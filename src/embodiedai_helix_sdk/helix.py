@@ -1,3 +1,4 @@
+import time
 import roslibpy
 import socket
 from typing import Optional, List, Dict, Any
@@ -78,6 +79,8 @@ class Helix:
 
             self._connect_camera()
 
+            time.sleep(0.5)
+            
             return self.is_connected()
         except Exception as e:
             print(f"Failed to connect to {self.host}:{self.port}: {e}")
