@@ -17,6 +17,7 @@ git clone https://github.com/eai-ag/embodiedai-helix-sdk.git
 cd embodiedai-helix-sdk
 # You might need to run: 'pip install --upgrade pip' before you run the following command
 pip install -e .
+# You might need to do : 'python -m pip install -e .' depending on your setup
 ```
 
 ## Hardware Setup
