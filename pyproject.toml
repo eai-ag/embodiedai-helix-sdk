@@ -7,7 +7,7 @@ name = "embodiedai-helix-sdk"
 authors = [
     { name = "Embodied AI SA", email = "info@embodiedai.ch" },
     ]
-version = "0.2.0"
+version = "0.3.0"
 description = "A Python SDK to control Helix robot arm via ROS"
 readme = "README.md"
 requires-python = ">=3.8"
