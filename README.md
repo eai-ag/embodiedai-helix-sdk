@@ -20,6 +20,11 @@ pip install -e .
 # You might need to do : 'python -m pip install -e .' depending on your setup
 ```
 
+### Tips:
+- If you have an old version of pip, you may need to upgrade by doing 
+`pip install --upgrade pip`
+- To install to a specific python version (say `python3`), then do `python3 -m pip install -e .`
+
 ## Hardware Setup
 
 Follow these steps to prepare the robot:
@@ -38,13 +43,26 @@ Follow these steps to prepare the robot:
 
 > **Note**: The robot must be in RUNNING state (green button) to accept motion commands.
 
+## Network setup
+Each robot has a preconfigured static IP: 192.168.238.10X
+Example: Robot 1 → 192.168.238.101, Robot 2 → 192.168.238.102
+
+
+### Minimal setup
+- Connect the helix robot to your computer via ethernet cable
+- Set the ip address of this port to be in the subenet of 192.168.238.0/24 (e.g.: 192.168.238.10). If you're on windows 11 follow this [link](https://support.epiloglaser.com/laser-machine/fibermark/system-requirements-setup/windows-11-tcp-ip-port-setup/
+)
+- You should now be able to ping the robot
+
+
 ## Quick Start
 
 ```python
 from embodiedai_helix_sdk import Helix
+import time
 
 # Connect to the robot
-helix = Helix("eai-helix-pi-0.local")
+helix = Helix("192.168.238.101") # <-- For robot 1, change last digit for other robots
 helix.connect()
 
 # Command end-effector pose
@@ -52,6 +70,7 @@ helix.command_cartesian(
     position=[0.0, 0.0, 0.5],              # x, y, z in meters
     orientation=[0.0, 0.0, 0.0, 1.0]      # quaternion [x, y, z, w]
 )
+time.sleep(3)
 
 # Read current pose
 pose = helix.get_estimated_cartesian()
@@ -85,6 +104,7 @@ tendons = helix.get_estimated_tendon_lengths()
 names = tendons['interface_names']
 values = tendons['values']
 tendon0_length = values[names.index('tendon0')]
+print("tendon 0", tendon0_length)
 ```
 
 ### Configuration Space
@@ -111,6 +131,7 @@ values = config['values']
 segment1_dx = values[names.index('segment1_dx')]
 segment1_dy = values[names.index('segment1_dy')]
 segment1_l = values[names.index('segment1_l')]
+print(f"dx: {segment1_dx}, dy: {segment1_dy}, l: {segment1_l}")
 ```
 
 ### Cartesian Pose
@@ -136,6 +157,9 @@ print(f"qx: {rotation['x']}, qy: {rotation['y']}, qz: {rotation['z']}, qw: {rota
 The robot accepts commands at three levels of abstraction. 
 
 > **Important**: Motion commands are only executed when the robot is in RUNNING state (green button).
+
+> **Note**: The commanding functions are *not* blocking, meaning if you send two consecutive commands, 
+you need to add an appropriate time.sleep after every command for the robot to reach the pose.
 
 ### Tendon Length Commands
 
@@ -221,10 +245,15 @@ helix.command_cartesian(
 
 ## Camera Integration
 
+> **Note**: The camera stream is still in development. You might face issues with capturing streams
+
 The simplest way to view the live camera feed is using a media player, like [VLC](https://www.videolan.org/):
 
+You can open VLC &#8594; go to Media/Open Network Stream &#8594; paste the URL : `tcp://192.168.238.101:5000`
+
+For linux users:
 ```bash
-vlc tcp://eai-helix-pi-0.local:5000
+vlc tcp://192.168.238.101:5000
 ```
 
 ### Capturing Images
@@ -234,7 +263,7 @@ The SDK provides built-in support for capturing images from the Helix robot's ca
 ```python
 from embodiedai_helix_sdk import Helix
 
-helix = Helix("eai-helix-pi-0.local")
+helix = Helix("192.168.238.101")
 helix.connect()
 
 image = helix.get_image()
@@ -256,7 +285,7 @@ When initialized (button is blue), the robot can be restored to its calibration 
 
 ```python
 # Connect to robot
-helix = Helix("eai-helix-pi-0.local")
+helix = Helix("192.168.238.101")
 helix.connect()
 
 # Check initial state
@@ -406,7 +435,7 @@ The Helix robot connects via Ethernet and can be accessed through multiple addre
 
 ### Connection Methods
 
-**1. Hostname (Recommended)**
+**1. Hostname**
 ```python
 helix = Helix("eai-helix-pi-0.local")
 ```
@@ -429,7 +458,13 @@ helix = Helix("192.168.238.101")
 
 
 
-## Web Interface
+## Web Interface (In construction)
+
+> **Important**: You should **NOT** 
+> 1. Open two or more instances (tabs) of the web interface
+> 2. Use the web interface at all when sending python commands
+>
+> This is due to clogging of the network through the camera stream. We are working for a fix.
 
 Each Helix robot hosts a built-in web interface for monitoring and manual control.
 
@@ -489,7 +524,7 @@ Calibration is performed through the web interface:
    - Robot becomes manually compliant - you can now move it by hand
 
 3. **Manually straighten the robot**
-   - Carefully position all three segments into a straight vertical configuration
+   - Carefully position all three segments into a straight vertical configuration using the *calibration tool*
    - Ensure tendons have even tension (no slack, but not over-tight)
    - Take your time to achieve accurate alignment
 
