@@ -171,12 +171,14 @@ helix.command_tendon_lengths(
     interface_names=['tendon6'],
     values=[0.24]
 )
+time.sleep(5)
 
 # Control one segment (tendons 6, 7, 8)
 helix.command_tendon_lengths(
     interface_names=['tendon6', 'tendon7', 'tendon8'],
     values=[0.24, 0.23, 0.19]
 )
+time.sleep(5)
 
 # Control all tendons
 helix.command_tendon_lengths(
@@ -187,6 +189,7 @@ helix.command_tendon_lengths(
             0.20, 0.20, 0.20,
             0.20, 0.20, 0.20]
 )
+time.sleep(5)
 ```
 
 **Limit handling**: Commands exceeding physical limits are clamped to valid ranges.
@@ -208,6 +211,7 @@ helix.command_configuration(
     interface_names=['segment1_dx', 'segment1_dy', 'segment1_l'],
     values=[0.05, 0.05, 0.2]
 )
+time.sleep(5)
 
 # Control all segments
 helix.command_configuration(
@@ -218,6 +222,7 @@ helix.command_configuration(
             0.05, 0.05, 0.20,
             0.03, 0.04, 0.23]
 )
+time.sleep(5)
 ```
 
 **Limit handling**: If the commanded configuration produces tendon lengths exceeding limits, all tendons in that segment are scaled proportionally to fit within constraints. Violations trigger warnings.
@@ -233,9 +238,10 @@ The system uses inverse kinematics to compute the required configuration and ten
 ```python
 # Command target pose
 helix.command_cartesian(
-    position=[0.0, 0.0, 0.6],           # [x, y, z] in meters
+    position=[0.1, 0.1, 0.45],           # [x, y, z] in meters
     orientation=[0.0, 0.0, 0.0, 1.0]    # [qx, qy, qz, qw] quaternion
 )
+time.sleep(5)
 ```
 
 **Limit handling**: The IK solver computes a configuration as close as possible to the target. The resulting configuration is then scaled if needed, and tendon commands are clamped to physical limits. The robot will achieve the closest reachable pose.
