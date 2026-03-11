@@ -308,6 +308,7 @@ if helix.is_running():
         position=[0.0, 0.0, 0.5],
         orientation=[0.0, 0.0, 0.0, 1.0]
     )
+    time.sleep(5)
 
 # Disarm when done (equivalent to pressing the button)
 helix.disarm()  # Returns to INITIALIZED state
