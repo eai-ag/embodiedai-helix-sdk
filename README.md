@@ -42,7 +42,7 @@ Follow these steps to prepare the robot:
 > **Note**: The robot must be in RUNNING state (green button) to accept motion commands.
 
 ## Network setup
-Each robot has a preconfigured static IP: 192.168.238.10X
+Each robot has a preconfigured static IP: 192.168.238.10X  
 Example: Robot 1 → 192.168.238.101, Robot 2 → 192.168.238.102
 
 
