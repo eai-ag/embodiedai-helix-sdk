@@ -5,6 +5,9 @@ from typing import Optional, List, Dict, Any
 from io import BytesIO
 from PIL import Image
 
+_ROS_LOG_LEVEL_NAMES = {10: "DEBUG", 20: "INFO", 30: "WARN", 40: "ERROR", 50: "FATAL"}
+_ROS_LOG_WARN_LEVEL = 30
+
 
 class Helix:
     def __init__(self, host: str, port: int = 9090):
@@ -29,6 +32,7 @@ class Helix:
         self._dynamixels_state_sub: Optional[roslibpy.Topic] = None
         self._ft_sensor_wrench_sub: Optional[roslibpy.Topic] = None
         self._ft_sensor_temperature_sub: Optional[roslibpy.Topic] = None
+        self._rosout_sub: Optional[roslibpy.Topic] = None
 
         self._latest_cartesian: Optional[Dict] = None
         self._latest_configuration: Optional[Dict] = None
@@ -77,6 +81,9 @@ class Helix:
             self._ft_sensor_temperature_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/temperature", "sensor_msgs/Temperature")
             self._ft_sensor_temperature_sub.subscribe(self._ft_sensor_temperature_callback)
 
+            self._rosout_sub = roslibpy.Topic(self.client, "/rosout", "rcl_interfaces/msg/Log")
+            self._rosout_sub.subscribe(self._rosout_callback)
+
             self._connect_camera()
 
             time.sleep(0.5)
@@ -102,6 +109,8 @@ class Helix:
                 self._ft_sensor_wrench_sub.unsubscribe()
             if self._ft_sensor_temperature_sub:
                 self._ft_sensor_temperature_sub.unsubscribe()
+            if self._rosout_sub:
+                self._rosout_sub.unsubscribe()
 
             self.client.close()
             self.client = None
@@ -123,6 +132,7 @@ class Helix:
             self._dynamixels_state_sub = None
             self._ft_sensor_wrench_sub = None
             self._ft_sensor_temperature_sub = None
+            self._rosout_sub = None
 
         if self._camera_socket:
             self._camera_socket.close()
@@ -264,6 +274,14 @@ class Helix:
 
     def _ft_sensor_temperature_callback(self, message):
         self._latest_ft_sensor_temperature = message.get("temperature")
+
+    def _rosout_callback(self, message):
+        level = message.get("level", 0)
+        if level < _ROS_LOG_WARN_LEVEL:
+            return
+
+        level_name = _ROS_LOG_LEVEL_NAMES.get(level, str(level))
+        print(f"[{level_name}] [{message.get('name')}] {message.get('msg')}")
 
     def get_estimated_cartesian(self) -> Optional[Dict[str, Any]]:
         return self._latest_cartesian
