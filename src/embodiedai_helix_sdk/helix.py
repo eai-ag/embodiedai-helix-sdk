@@ -1,3 +1,4 @@
+import os
 import time
 import roslibpy
 import socket
@@ -13,6 +14,8 @@ class Helix:
     def __init__(self, host: str, port: int = 9090):
         self.host = host
         self.port = port
+        self.has_gripper = os.environ.get("HAS_GRIPPER", "true").lower() == "true"
+        self.has_ft_sensor = os.environ.get("HAS_FT_SENSOR", "true").lower() == "true"
         self.client: Optional[roslibpy.Ros] = None
         self._gripper_open_service: Optional[roslibpy.Service] = None
         self._gripper_close_service: Optional[roslibpy.Service] = None
@@ -50,10 +53,21 @@ class Helix:
             self.client = roslibpy.Ros(host=self.host, port=self.port)
             self.client.run(timeout=timeout)
 
-            self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
-            self._gripper_close_service = roslibpy.Service(self.client, "/helix/gripper/close", "std_srvs/Trigger")
-            self._gripper_set_position_service = roslibpy.Service(self.client, "/helix/gripper/set_position", "helix_interfaces/SetFloat32")
-            self._ft_sensor_reset_service = roslibpy.Service(self.client, "/helix/ft_sensor/reset", "std_srvs/Trigger")
+            if self.has_gripper:
+                self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
+                self._gripper_close_service = roslibpy.Service(self.client, "/helix/gripper/close", "std_srvs/Trigger")
+                self._gripper_set_position_service = roslibpy.Service(self.client, "/helix/gripper/set_position", "helix_interfaces/SetFloat32")
+
+                self._connect_camera()
+
+            if self.has_ft_sensor:
+                self._ft_sensor_reset_service = roslibpy.Service(self.client, "/helix/ft_sensor/reset", "std_srvs/Trigger")
+
+                self._ft_sensor_wrench_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/wrench", "geometry_msgs/WrenchStamped")
+                self._ft_sensor_wrench_sub.subscribe(self._ft_sensor_wrench_callback)
+
+                self._ft_sensor_temperature_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/temperature", "sensor_msgs/Temperature")
+                self._ft_sensor_temperature_sub.subscribe(self._ft_sensor_temperature_callback)
 
             self._cmd_cartesian_pub = roslibpy.Topic(self.client, "/helix/command/cartesian", "geometry_msgs/Pose")
             self._cmd_configuration_pub = roslibpy.Topic(self.client, "/helix/command/configuration", "control_msgs/InterfaceValue")
@@ -75,16 +89,9 @@ class Helix:
             self._dynamixels_state_sub = roslibpy.Topic(self.client, "/helix/state/dynamixels", "sensor_msgs/JointState")
             self._dynamixels_state_sub.subscribe(self._dynamixels_state_callback)
 
-            self._ft_sensor_wrench_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/wrench", "geometry_msgs/WrenchStamped")
-            self._ft_sensor_wrench_sub.subscribe(self._ft_sensor_wrench_callback)
-
-            self._ft_sensor_temperature_sub = roslibpy.Topic(self.client, "/helix/state/ft_sensor/temperature", "sensor_msgs/Temperature")
-            self._ft_sensor_temperature_sub.subscribe(self._ft_sensor_temperature_callback)
-
             self._rosout_sub = roslibpy.Topic(self.client, "/rosout", "rcl_interfaces/msg/Log")
             self._rosout_sub.subscribe(self._rosout_callback)
 
-            self._connect_camera()
 
             time.sleep(0.5)
             
@@ -146,6 +153,9 @@ class Helix:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
+        if not self.has_gripper:
+            raise RuntimeError("This robot has no gripper.")
+
         try:
             request = roslibpy.ServiceRequest({})
             response = self._gripper_open_service.call(request, timeout=5.0)
@@ -162,6 +172,9 @@ class Helix:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
 
+        if not self.has_gripper:
+            raise RuntimeError("This robot has no gripper.")
+
         try:
             request = roslibpy.ServiceRequest({})
             response = self._gripper_close_service.call(request, timeout=5.0)
@@ -177,6 +190,9 @@ class Helix:
     def gripper_set_position(self, position: float) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        if not self.has_gripper:
+            raise RuntimeError("This robot has no gripper.")
 
         if not 0.0 <= position <= 1.0:
             raise ValueError("position must be between 0.0 (closed) and 1.0 (open)")
@@ -296,14 +312,21 @@ class Helix:
         return self._latest_dynamixels_state
 
     def get_ft_sensor_wrench(self) -> Optional[Dict[str, Any]]:
+        if not self.has_ft_sensor:
+            raise RuntimeError("This robot has no FT Sensor.")
         return self._latest_ft_sensor_wrench
 
     def get_ft_sensor_temperature(self) -> Optional[float]:
+        if not self.has_ft_sensor:
+            raise RuntimeError("This robot has no FT Sensor.")
         return self._latest_ft_sensor_temperature
 
     def ft_sensor_reset(self) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
+
+        if not self.has_ft_sensor:
+            raise RuntimeError("This robot has no FT sensor.")
 
         try:
             request = roslibpy.ServiceRequest({})
@@ -350,6 +373,8 @@ class Helix:
         return self._system_state == "INITIALIZED"
 
     def _connect_camera(self):
+        if not self.has_gripper:
+            raise RuntimeError("This robot has no gripper.")
         if self._camera_socket is not None:
             return
 
@@ -365,6 +390,9 @@ class Helix:
                 self._camera_socket = None
 
     def get_image(self):
+        if not self.has_gripper:
+            raise RuntimeError("This robot has no gripper.")
+
         if self._camera_socket is None:
             return None
 
