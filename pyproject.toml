@@ -11,7 +11,7 @@ version = "0.3.0"
 description = "A Python SDK to control Helix robot arm via ROS"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
