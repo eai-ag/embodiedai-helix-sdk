@@ -1,4 +1,4 @@
-import os
+import threading
 import time
 import roslibpy
 import socket
@@ -14,8 +14,8 @@ class Helix:
     def __init__(self, host: str, port: int = 9090):
         self.host = host
         self.port = port
-        self.has_gripper = os.environ.get("HAS_GRIPPER", "true").lower() == "true"
-        self.has_ft_sensor = os.environ.get("HAS_FT_SENSOR", "true").lower() == "true"
+        self.has_gripper: Optional[bool] = None
+        self.has_ft_sensor: Optional[bool] = None
         self.client: Optional[roslibpy.Ros] = None
         self._gripper_open_service: Optional[roslibpy.Service] = None
         self._gripper_close_service: Optional[roslibpy.Service] = None
@@ -52,6 +52,10 @@ class Helix:
         try:
             self.client = roslibpy.Ros(host=self.host, port=self.port)
             self.client.run(timeout=timeout)
+
+            self._read_robot_variables()
+            
+            print(self.has_gripper, self.has_ft_sensor)
 
             if self.has_gripper:
                 self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
@@ -99,6 +103,24 @@ class Helix:
         except Exception as e:
             print(f"Failed to connect to {self.host}:{self.port}: {e}")
             return False
+
+    def _read_robot_variables(self, timeout: float = 3.0):
+        received = threading.Event()
+
+        def _on_robot_variables(message):
+            self.has_gripper = message.get("has_gripper", True)
+            self.has_ft_sensor = message.get("has_ft_sensor", True)
+            received.set()
+
+        robot_variables_sub = roslibpy.Topic(self.client, "/helix/state/robot_variables", "helix_interfaces/RobotVariables")
+        robot_variables_sub.subscribe(_on_robot_variables)
+
+        if not received.wait(timeout=timeout):
+            print("No robot_variables received, defaulting has_gripper/has_ft_sensor to True")
+            self.has_gripper = True
+            self.has_ft_sensor = True
+
+        robot_variables_sub.unsubscribe()
 
     def disconnect(self):
         if self.client and self.client.is_connected:
@@ -324,7 +346,6 @@ class Helix:
     def ft_sensor_reset(self) -> bool:
         if not self.is_connected():
             raise ConnectionError("Not connected to robot. Call connect() first.")
-
         if not self.has_ft_sensor:
             raise RuntimeError("This robot has no FT sensor.")
 
