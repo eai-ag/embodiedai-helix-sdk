@@ -1,17 +1,12 @@
 name: Template issue
 description: Report a problem with a Helix robot or the SDK
 body:
-  - type: dropdown
+  - type: input
     id: robot-id
     attributes:
       label: Robot ID
       description: Which robot is affected?
-      options:
-        - Helix 1
-        - Helix 2
-        - Helix 6
-        - Helix 7
-        - Not robot-specific
+      placeholder: e.g. Helix 1
     validations:
       required: true
 
