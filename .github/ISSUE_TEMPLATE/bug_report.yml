@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a problem with a Helix robot or the SDK
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: robot-id
+    attributes:
+      label: Robot ID
+      description: Which robot is affected?
+      options:
+        - Helix 1
+        - Helix 2
+        - Helix 6
+        - Helix 7
+        - Not robot-specific
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description of problem
+      description: What happened, and what did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Once
+        - Intermittent
+        - Every time
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "1 – Blocking: robot unusable, operations stopped"
+        - "2 – Major: workaround exists, but degraded"
+        - "3 – Minor: annoyance, no operational impact"
+        - "4 – Cosmetic / improvement request"
+    validations:
+      required: true
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Photos, video, logs, error messages. Drag and drop files here.
+    validations:
+      required: false
