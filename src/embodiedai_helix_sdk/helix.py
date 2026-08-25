@@ -54,8 +54,6 @@ class Helix:
             self.client.run(timeout=timeout)
 
             self._read_robot_variables()
-            
-            print(self.has_gripper, self.has_ft_sensor)
 
             if self.has_gripper:
                 self._gripper_open_service = roslibpy.Service(self.client, "/helix/gripper/open", "std_srvs/Trigger")
